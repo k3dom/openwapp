@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0-rc.116",
+    "@openwapp/fingerprints": "workspace:*",
     "@openwapp/oxfmt": "workspace:*",
     "@openwapp/oxlint": "workspace:*",
     "@openwapp/tsconfig": "workspace:*",
