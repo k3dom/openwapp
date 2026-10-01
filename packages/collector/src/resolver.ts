@@ -1,3 +1,4 @@
+import type { ResolverOptions } from 'node:dns'
 import Dns from 'node:dns/promises'
 
 import { Rule } from '@openwapp/matcher'
@@ -77,26 +78,33 @@ const lookups: {
     (await resolver.resolveTxt(hostname)).map((chunks) => chunks.join('')),
 }
 
-export const layerNode = Layer.succeed(
-  Resolver,
-  Resolver.of({
-    resolve: Effect.fn('Resolver.resolve')((hostname, type) =>
-      Effect.tryPromise({
-        try: (signal) => {
-          const resolver = new Dns.Resolver()
-          resolver.setServers(Dns.getServers())
-          signal.addEventListener('abort', () => resolver.cancel())
-          return lookups[type](resolver, hostname)
-        },
-        catch: (cause) => new ResolverError({ hostname, type, cause }),
-      }).pipe(
-        Effect.catchIf(
-          ({ cause }) =>
-            Predicate.hasProperty(cause, 'code') &&
-            (cause.code === Dns.NODATA || cause.code === Dns.NOTFOUND),
-          () => Effect.succeed([])
+export interface NodeOptions extends ResolverOptions {
+  readonly servers?: ReadonlyArray<string>
+}
+
+export const layerNodeOptions = ({ servers, ...options }: NodeOptions = {}) =>
+  Layer.succeed(
+    Resolver,
+    Resolver.of({
+      resolve: Effect.fn('Resolver.resolve')((hostname, type) =>
+        Effect.tryPromise({
+          try: (signal) => {
+            const resolver = new Dns.Resolver(options)
+            resolver.setServers(servers ?? Dns.getServers())
+            signal.addEventListener('abort', () => resolver.cancel())
+            return lookups[type](resolver, hostname)
+          },
+          catch: (cause) => new ResolverError({ hostname, type, cause }),
+        }).pipe(
+          Effect.catchIf(
+            ({ cause }) =>
+              Predicate.hasProperty(cause, 'code') &&
+              (cause.code === Dns.NODATA || cause.code === Dns.NOTFOUND),
+            () => Effect.succeed([])
+          )
         )
-      )
-    ),
-  })
-)
+      ),
+    })
+  )
+
+export const layerNode = layerNodeOptions()

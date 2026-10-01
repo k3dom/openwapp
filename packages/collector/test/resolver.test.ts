@@ -86,7 +86,6 @@ const zone: Record<string, ReadonlyArray<Buffer> | number> = {
   'NS broken.example.com': SERVFAIL,
 }
 
-const servers = Dns.getServers()
 const socket = createSocket('udp4')
 
 beforeAll(async () => {
@@ -125,21 +124,35 @@ beforeAll(async () => {
     )
   })
   await new Promise<void>((resolve) => socket.bind(0, '127.0.0.1', resolve))
-  Dns.setServers([`127.0.0.1:${(socket.address() as AddressInfo).port}`])
 })
 
 afterAll(() => {
-  Dns.setServers(servers)
   socket.close()
 })
+
+const server = () => `127.0.0.1:${(socket.address() as AddressInfo).port}`
 
 const resolve = (hostname: string, type: Rule.DnsRecordType) =>
   Effect.gen(function* () {
     const resolver = yield* Resolver.Resolver
     return yield* resolver.resolve(hostname, type)
-  }).pipe(Effect.provide(Resolver.layerNode))
+  }).pipe(Effect.provide(Resolver.layerNodeOptions({ servers: [server()] })))
 
 describe('Resolver.layerNode', () => {
+  it.effect('resolves through the servers set with Dns.setServers', () =>
+    Effect.gen(function* () {
+      const servers = Dns.getServers()
+      yield* Effect.acquireRelease(
+        Effect.sync(() => Dns.setServers([server()])),
+        () => Effect.sync(() => Dns.setServers(servers))
+      )
+      const resolver = yield* Resolver.Resolver
+      expect(yield* resolver.resolve('example.com', 'A')).toEqual(['192.0.2.1'])
+    }).pipe(Effect.scoped, Effect.provide(Resolver.layerNode))
+  )
+})
+
+describe('Resolver.layerNodeOptions', () => {
   it.effect.each<[Rule.DnsRecordType, string, ReadonlyArray<string>]>([
     ['A', 'example.com', ['192.0.2.1']],
     ['AAAA', 'example.com', ['2001:db8::1']],
