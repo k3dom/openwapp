@@ -132,8 +132,8 @@ importers:
         version: link:../matcher
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.116
-        version: 4.0.0-rc.116(effect@4.0.0-rc.116)(vitest@5.0.1)
+        specifier: 4.0.0
+        version: 4.0.0(effect@4.0.0)(vitest@5.0.1)
       '@openwapp/fingerprints':
         specifier: workspace:*
         version: link:../fingerprints
@@ -156,8 +156,8 @@ importers:
         specifier: 5.0.1
         version: 5.0.1(vitest@5.0.1)
       effect:
-        specifier: 4.0.0-rc.116
-        version: 4.0.0-rc.116
+        specifier: 4.0.0
+        version: 4.0.0
       oxfmt:
         specifier: 0.68.0
         version: 0.68.0
@@ -189,8 +189,8 @@ importers:
   packages/matcher:
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.116
-        version: 4.0.0-rc.116(effect@4.0.0-rc.116)(vitest@5.0.1)
+        specifier: 4.0.0
+        version: 4.0.0(effect@4.0.0)(vitest@5.0.1)
       '@openwapp/fingerprints':
         specifier: workspace:*
         version: link:../fingerprints
@@ -213,8 +213,8 @@ importers:
         specifier: 5.0.1
         version: 5.0.1(vitest@5.0.1)
       effect:
-        specifier: 4.0.0-rc.116
-        version: 4.0.0-rc.116
+        specifier: 4.0.0
+        version: 4.0.0
       oxfmt:
         specifier: 0.68.0
         version: 0.68.0
@@ -371,10 +371,10 @@ packages:
     resolution: {integrity: sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ==}
     engines: {node: '>= 20.12.0'}
 
-  '@effect/vitest@4.0.0-rc.116':
-    resolution: {integrity: sha512-q42ue4hAa5AcPBwqi8rvMvR1Jstr+JjsyyxEBUoBk+WWm8otnqFxQ+XbWslW1QSwdg5+2Fdgd7z59IValt9Oiw==}
+  '@effect/vitest@4.0.0':
+    resolution: {integrity: sha512-kGElCPFGtP+CgMCwV/HjJWqtE3zYo6I1+8MSA54l+EI24lPU9p2Efa+TBp1jfkg9j711KKzEqgSAy3VzTsb76Q==}
     peerDependencies:
-      effect: ^4.0.0-rc.116
+      effect: ^4.0.0
       vitest: '>=5.0.0 <6.0.0'
 
   '@jridgewell/resolve-uri@3.1.2':
@@ -1141,8 +1141,8 @@ packages:
       oxc-resolver:
         optional: true
 
-  effect@4.0.0-rc.116:
-    resolution: {integrity: sha512-nawqJHSjHV8XIBRZNZ+D7cLZpN3kkSjzy6aiT9ofKENsl7xAMFKEoDa0itN5JFl3GUQ1PIN1T1HNlva5+xyO/A==}
+  effect@4.0.0:
+    resolution: {integrity: sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ==}
 
   empathic@2.1.0:
     resolution: {integrity: sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==}
@@ -1723,9 +1723,9 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@effect/vitest@4.0.0-rc.116(effect@4.0.0-rc.116)(vitest@5.0.1)':
+  '@effect/vitest@4.0.0(effect@4.0.0)(vitest@5.0.1)':
     dependencies:
-      effect: 4.0.0-rc.116
+      effect: 4.0.0
       vitest: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.1(@types/node@26.6.1))
 
   '@jridgewell/resolve-uri@3.1.2': {}
@@ -2151,7 +2151,7 @@ snapshots:
 
   dts-resolver@3.0.0: {}
 
-  effect@4.0.0-rc.116: {}
+  effect@4.0.0: {}
 
   empathic@2.1.0: {}
 

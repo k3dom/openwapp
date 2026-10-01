@@ -12,12 +12,8 @@ import {
   type Rule,
 } from '@openwapp/matcher'
 import { Deferred, Effect, Fiber, Layer } from 'effect'
+import { HttpClient, HttpClientError, HttpClientResponse } from 'effect/http'
 import { TestClock } from 'effect/testing'
-import {
-  HttpClient,
-  HttpClientError,
-  HttpClientResponse,
-} from 'effect/unstable/http'
 
 import * as Certificate from '#/certificate.ts'
 import * as Collector from '#/collector.ts'

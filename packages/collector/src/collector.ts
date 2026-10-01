@@ -5,11 +5,7 @@ import {
   Requirements,
 } from '@openwapp/matcher'
 import { Array, Effect, Layer, Option } from 'effect'
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpClientRequest,
-} from 'effect/unstable/http'
+import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 
 import * as Certificate from '#/certificate.ts'
 import * as Page from '#/page.ts'

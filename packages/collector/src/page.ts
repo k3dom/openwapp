@@ -1,6 +1,6 @@
 import type { Observation, Requirements } from '@openwapp/matcher'
 import { Array, Context, Effect, Layer, pipe, Record, Schema } from 'effect'
-import { HttpClient } from 'effect/unstable/http'
+import { HttpClient } from 'effect/http'
 
 export type Snapshot = Pick<
   Observation.Observation,
