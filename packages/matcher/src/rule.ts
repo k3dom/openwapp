@@ -17,7 +17,7 @@ export const DnsRecordType = Schema.Literals([
 ])
 export type DnsRecordType = typeof DnsRecordType.Type
 
-const LowercaseName = Schema.String.check(Schema.isLowercased())
+export const LowercaseName = Schema.String.check(Schema.isLowercased())
 
 export const Rule = Schema.TaggedUnion({
   Url: { pattern: Pattern.Pattern },

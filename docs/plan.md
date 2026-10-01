@@ -27,5 +27,15 @@ It consists of three parts:
 | Function                                               | Purpose                                                                     |
 | ------------------------------------------------------ | --------------------------------------------------------------------------- |
 | `Catalog.decode(input): Effect<Catalog, CatalogError>` | Decode and validate the raw technologies, categories and groups             |
+| `new Observation(fields): Observation`                 | Hold what the collector observed on a site, with one field per rule tag     |
 | `Requirements.fromCatalog(catalog): Requirements`      | List what the collector must gather, such as JS globals and DOM selectors   |
 | `Matcher.match(catalog, observation): Detection[]`     | Match the patterns, then resolve requires, excludes, implies and confidence |
+
+The `Observation` links the three steps. `Requirements` tells the collector
+which of its fields to fill, the collector fills them and `Matcher` tests each
+rule against the field named after its tag. Fields without a key, such as `url`
+or `scriptSrc`, hold a list of values. Keyed fields, such as `header` or `dns`,
+map each key to its values. `domAttribute` and `domProperty` are keyed by
+selector, then by attribute or property. `domExists` holds the selectors that
+matched. Every field defaults to empty, so the collector only fills what it
+gathered.

@@ -69,6 +69,26 @@ const program = Catalog.decode(input).pipe(
 await Effect.runPromise(program)
 ```
 
+### Observation
+
+An `Observation` holds what was observed on a site, with one field per rule tag.
+Every field defaults to empty, so fill only what you gathered. Header, cookie
+and meta names must be lowercase. The constructor throws when a field is
+invalid.
+
+```ts
+import { Observation } from '@openwapp/matcher'
+
+const observation = new Observation.Observation({
+  url: ['https://example.com/'],
+  header: new Map([['x-powered-by', ['PHP/8.3.0']]]),
+  scriptSrc: ['https://example.com/jquery-3.7.1.min.js'],
+  dns: new Map([['TXT', ['v=spf1 include:_spf.google.com ~all']]]),
+  domExists: new Set(['#wpadminbar']),
+  domAttribute: new Map([['link', new Map([['href', ['/wp-content/a.css']]]])]),
+})
+```
+
 ## License
 
 MIT. The matcher ships without fingerprint data. Install
