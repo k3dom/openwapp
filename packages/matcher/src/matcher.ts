@@ -76,6 +76,7 @@ export const match = (
     DomExists: ({ selector, confidence, version }) => ({
       confidence,
       version,
+      // A found selector counts as a single match without captures.
       matches: observation.domExists.has(selector) ? [[]] : [],
     }),
     DomText: ({ selector, pattern }) =>
@@ -97,6 +98,9 @@ export const match = (
       Technology: ({ name }) => detected.has(name),
       Category: ({ id }) => categories.has(id),
     })
+    // Implied technologies run their rules as well to pick up a version. A
+    // technology stays matched once its rules ran, so it can exclude what it
+    // requires, as BigCommerce B2B Edition does with BigCommerce.
     const ready = [...waiting].filter(
       ({ name, requires }) =>
         requires.length === 0 || detected.has(name) || requires.some(satisfied)
@@ -121,12 +125,16 @@ export const match = (
       })
     }
 
+    // Rules with zero confidence only extract a version, such as `_.VERSION`,
+    // which Lodash and Underscore.js share.
     const present = [...evidence.values()].filter(
       ({ confidence }) => confidence > 0
     )
     const excluded = new Set(
       present.flatMap(({ technology, confidence }) =>
         technology.excludes.filter((name) => {
+          // Of two technologies that exclude each other, the more confident
+          // one stays.
           const other = evidence.get(name)
           return !(
             other !== undefined &&
@@ -142,6 +150,8 @@ export const match = (
         .filter(({ technology }) => !excluded.has(technology.name))
         .map((entry) => [entry.technology.name, entry])
     )
+    // A technology is queued again whenever an implication raises its
+    // confidence, so the highest one wins regardless of order.
     const queue = [...detected.values()]
     for (const { technology, confidence } of queue) {
       for (const implication of technology.implies) {
@@ -181,6 +191,8 @@ export const match = (
         .filter(({ name }) => name === technology.name)
         .map(({ version }) => version),
     ]
+      // Long captures and numbers from 10000 up are usually hashes, build
+      // numbers or timestamps rather than versions.
       .filter(
         (version) =>
           version.length <= 15 && !(Number.parseInt(version, 10) >= 10_000)
