@@ -13,6 +13,17 @@ It consists of three parts:
 
 - **fingerprints**: the enthec data, kept in sync with upstream
 - **matcher**: turns the fingerprints into a typed catalog and matches it
-  against what was observed on a site
+  against what was observed on a site. The
+  [HTTP Archive fork of Wappalyzer](https://github.com/HTTPArchive/wappalyzer/blob/main/src/js/wappalyzer.js#L104)
+  serves only as a reference for how detections are resolved. Its code must not
+  be copied.
 - **collector**: visits a site, gathers what the matcher needs and reports what
   was detected
+
+## Matcher
+
+| Function                                               | Purpose                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `Catalog.decode(input): Effect<Catalog, CatalogError>` | Decode and validate the raw technologies, categories and groups             |
+| `Requirements.fromCatalog(catalog): Requirements`      | List what the collector must gather, such as JS globals and DOM selectors   |
+| `Matcher.match(catalog, observation): Detection[]`     | Match the patterns, then resolve requires, excludes, implies and confidence |
