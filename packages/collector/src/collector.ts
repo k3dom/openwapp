@@ -9,6 +9,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import { NetAddress } from 'effect/net'
 
 import * as Certificate from '#/certificate.ts'
+import * as Markup from '#/markup.ts'
 import * as Page from '#/page.ts'
 import * as Resolver from '#/resolver.ts'
 
@@ -99,7 +100,11 @@ export const collect = Effect.fn('Collector.collect')(
       },
       { concurrency: 'unbounded' }
     )
-    return new Observation.Observation({ ...snapshot, ...fields })
+    return new Observation.Observation({
+      ...snapshot,
+      ...Markup.extract(snapshot.html.at(-1) ?? '', site, requirements),
+      ...fields,
+    })
   },
   Effect.provideService(HttpClient.TracerPropagationEnabled, false)
 )

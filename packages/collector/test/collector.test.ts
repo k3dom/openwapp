@@ -196,6 +196,65 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect(
+    'extracts what the catalog asks for from the html of the page',
+    () => {
+      const { layer } = site({
+        'http://example.com/': () =>
+          new Response(null, {
+            status: 301,
+            headers: { location: 'https://www.example.org/shop/' },
+          }),
+        'https://www.example.org/shop/': () =>
+          new Response(
+            `<html><head>
+            <meta name="generator" content="Example 1.0">
+            <style>.example-class {}</style>
+            <script src="example.js"></script>
+            <script>window.example = true</script>
+          </head><body><div id="example" data-version="1.0">Example shop</div></body></html>`
+          ),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'http://example.com/',
+          requirementsOf({
+            Example: {
+              text: ['shop'],
+              css: ['\\.example-class'],
+              scripts: ['window\\.example'],
+              scriptSrc: ['example\\.js'],
+              meta: { generator: 'Example' },
+              dom: {
+                '#example': {
+                  exists: '',
+                  text: 'Example',
+                  attributes: { 'data-version': '' },
+                },
+              },
+            },
+          })
+        )
+        expect(observation.text).toEqual(['Example shop'])
+        expect(observation.css).toEqual(['.example-class {}'])
+        expect(observation.script).toEqual(['window.example = true'])
+        expect(observation.scriptSrc).toEqual([
+          'https://www.example.org/shop/example.js',
+        ])
+        expect(observation.meta).toEqual(
+          new Map([['generator', ['Example 1.0']]])
+        )
+        expect(observation.domExists).toEqual(new Set(['#example']))
+        expect(observation.domText).toEqual(
+          new Map([['#example', ['Example shop']]])
+        )
+        expect(observation.domAttribute).toEqual(
+          new Map([['#example', new Map([['data-version', ['1.0']]])]])
+        )
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
   it.effect('fetches robots.txt only when the catalog has robots rules', () => {
     const { layer, requested } = site({
       'https://example.com/': () => new Response(''),
@@ -585,10 +644,11 @@ describe('Collector.collect', () => {
     return Effect.gen(function* () {
       const observation = yield* Collector.collect(
         'https://example.com/',
-        requirementsOf({})
+        requirementsOf({ Example: { text: ['rendered'] } })
       )
       expect(observation.url).toEqual(['https://example.com/rendered'])
       expect(observation.html).toEqual(['<html>rendered</html>'])
+      expect(observation.text).toEqual(['rendered'])
     }).pipe(
       Effect.provide(
         Layer.succeed(Page.Page, {
@@ -667,7 +727,12 @@ describe('Collector.detectPromise', () => {
     const server = await serve((_, response) => {
       response.setHeader('server', 'nginx/1.25.3')
       response.setHeader('x-powered-by', 'PHP/8.3.0')
-      response.end('<html></html>')
+      response.end(
+        `<html><head>
+          <meta name="generator" content="WordPress 6.4.2">
+          <script src="/wp-includes/js/jquery/jquery-3.7.1.min.js"></script>
+        </head><body></body></html>`
+      )
     })
     try {
       const detections = await Collector.detectPromise(catalog, server.url)
@@ -675,7 +740,14 @@ describe('Collector.detectPromise', () => {
         detections.map(
           ({ technology, version }) => `${technology.name} ${version}`
         )
-      ).toEqual(expect.arrayContaining(['Nginx 1.25.3', 'PHP 8.3.0']))
+      ).toEqual(
+        expect.arrayContaining([
+          'Nginx 1.25.3',
+          'PHP 8.3.0',
+          'WordPress 6.4.2',
+          'jQuery 3.7.1',
+        ])
+      )
     } finally {
       await server.close()
     }

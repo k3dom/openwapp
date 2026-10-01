@@ -36,7 +36,10 @@
     "check": "pnpm run lint && pnpm run format:check"
   },
   "dependencies": {
-    "@openwapp/matcher": "workspace:*"
+    "@openwapp/matcher": "workspace:*",
+    "css-select": "7.0.0",
+    "domutils": "4.0.2",
+    "htmlparser2": "12.0.0"
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0",
@@ -47,6 +50,7 @@
     "@openwapp/vitest": "workspace:*",
     "@types/node": "26.6.1",
     "@vitest/coverage-v8": "5.0.1",
+    "domhandler": "6.0.1",
     "effect": "4.0.0",
     "oxfmt": "0.68.0",
     "oxlint": "1.82.0",
