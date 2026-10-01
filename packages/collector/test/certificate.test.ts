@@ -8,6 +8,11 @@ import { Deferred, Effect, Fiber } from 'effect'
 
 import * as Certificate from '#/certificate.ts'
 
+// Regenerate the fixtures from within test/fixtures with:
+// openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+//   -days 36500 -subj '/C=US/O=Example CA/CN=Example Issuer' \
+//   -addext subjectAltName=DNS:localhost,IP:127.0.0.1 \
+//   -keyout key.pem -out certificate.pem
 const secureServer = Effect.acquireRelease(
   Effect.promise(async () => {
     const server = createServer(
