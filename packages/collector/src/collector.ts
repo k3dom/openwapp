@@ -12,13 +12,18 @@ import {
 } from 'effect/unstable/http'
 
 import * as Page from '#/page.ts'
+import * as Resolver from '#/resolver.ts'
 
 export interface PromiseOptions {
   readonly signal?: AbortSignal
 }
 
-export const layer: Layer.Layer<Page.Page | HttpClient.HttpClient> =
-  Page.layerHttp.pipe(Layer.provideMerge(FetchHttpClient.layer))
+export const layer: Layer.Layer<
+  Page.Page | HttpClient.HttpClient | Resolver.Resolver
+> = Layer.mergeAll(
+  Page.layerHttp.pipe(Layer.provideMerge(FetchHttpClient.layer)),
+  Resolver.layerNode
+)
 
 export const collect = Effect.fn('Collector.collect')(
   function* (
@@ -27,13 +32,14 @@ export const collect = Effect.fn('Collector.collect')(
   ): Effect.fn.Return<
     Observation.Observation,
     Page.PageError,
-    Page.Page | HttpClient.HttpClient
+    Page.Page | HttpClient.HttpClient | Resolver.Resolver
   > {
     const target = yield* Effect.try({
       try: () => new URL(url),
       catch: (cause) => new Page.PageError({ url: String(url), cause }),
     })
     const page = yield* Page.Page
+    const resolver = yield* Resolver.Resolver
     const client = (yield* HttpClient.HttpClient).pipe(
       HttpClient.mapRequest(HttpClientRequest.prependUrl(target.origin)),
       HttpClient.followRedirects(),
@@ -63,6 +69,29 @@ export const collect = Effect.fn('Collector.collect')(
             ),
           { concurrency: 'unbounded' }
         ).pipe(Effect.map(([, found]) => new Map(found))),
+        dns: /^\[|^[\d.]+$/.test(target.hostname)
+          ? Effect.succeed(new Map())
+          : Effect.forEach(
+              requirements.dns,
+              (type) =>
+                resolver
+                  .resolve(
+                    type === 'A' || type === 'AAAA' || type === 'CNAME'
+                      ? target.hostname
+                      : target.hostname.replace(/^www\./, ''),
+                    type
+                  )
+                  .pipe(
+                    Effect.tapError(Effect.logDebug),
+                    Effect.orElseSucceed(() => []),
+                    Effect.map((records) =>
+                      Array.isReadonlyArrayNonEmpty(records)
+                        ? [[type, records] as const]
+                        : []
+                    )
+                  ),
+              { concurrency: 'unbounded' }
+            ).pipe(Effect.map((found) => new Map(found.flat()))),
       },
       { concurrency: 'unbounded' }
     )
@@ -89,7 +118,7 @@ export const detect = Effect.fn('Collector.detect')(function* (
 ): Effect.fn.Return<
   ReadonlyArray<Matcher.Detection>,
   Page.PageError,
-  Page.Page | HttpClient.HttpClient
+  Page.Page | HttpClient.HttpClient | Resolver.Resolver
 > {
   const observation = yield* collect(url, Requirements.fromCatalog(catalog))
   return Matcher.match(catalog, observation)

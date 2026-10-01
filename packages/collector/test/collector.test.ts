@@ -5,7 +5,12 @@ import type { AddressInfo } from 'node:net'
 import { dirname, join } from 'node:path'
 
 import { describe, expect, it } from '@effect/vitest'
-import { Catalog, Observation, Requirements } from '@openwapp/matcher'
+import {
+  Catalog,
+  Observation,
+  Requirements,
+  type Rule,
+} from '@openwapp/matcher'
 import { Effect, Layer } from 'effect'
 import {
   HttpClient,
@@ -15,6 +20,7 @@ import {
 
 import * as Collector from '#/collector.ts'
 import * as Page from '#/page.ts'
+import * as Resolver from '#/resolver.ts'
 
 const catalogOf = (technologies: Record<string, object>) =>
   Catalog.decodeSync({
@@ -31,7 +37,25 @@ const catalogOf = (technologies: Record<string, object>) =>
 const requirementsOf = (technologies: Record<string, object>) =>
   Requirements.fromCatalog(catalogOf(technologies))
 
-const site = (routes: Record<string, () => Response | Error>) => {
+const site = (
+  routes: Record<string, () => Response | Error>,
+  records: Record<
+    string,
+    Partial<Record<Rule.DnsRecordType, ReadonlyArray<string> | Error>>
+  > = {}
+) => {
+  const resolved: Array<string> = []
+  const resolverLayer = Layer.succeed(Resolver.Resolver, {
+    resolve: (hostname, type) => {
+      resolved.push(`${type} ${hostname}`)
+      const found = records[hostname]?.[type] ?? []
+      return found instanceof Error
+        ? Effect.fail(
+            new Resolver.ResolverError({ hostname, type, cause: found })
+          )
+        : Effect.succeed(found)
+    },
+  })
   const requested: Array<string> = []
   const headers: Array<Record<string, string>> = []
   const client = HttpClient.make((request, url) => {
@@ -53,8 +77,13 @@ const site = (routes: Record<string, () => Response | Error>) => {
   return {
     requested,
     headers,
+    resolved,
     clientLayer,
-    layer: Page.layerHttp.pipe(Layer.provideMerge(clientLayer)),
+    resolverLayer,
+    layer: Layer.mergeAll(
+      Page.layerHttp.pipe(Layer.provideMerge(clientLayer)),
+      resolverLayer
+    ),
   }
 }
 
@@ -250,6 +279,89 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect('resolves the dns records the catalog asks for', () => {
+    const { layer, resolved } = site(
+      { 'https://www.example.com/': () => new Response('') },
+      {
+        'example.com': {
+          MX: ['10 aspmx.l.google.com', '20 alt1.aspmx.l.google.com'],
+          TXT: ['v=spf1 include:_spf.google.com ~all'],
+        },
+        'www.example.com': { CNAME: ['example.cdn.net'] },
+      }
+    )
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://www.example.com/',
+        requirementsOf({
+          Mail: { dns: { MX: ['google\\.com'], TXT: ['_spf\\.google'] } },
+          Cdn: { dns: { CNAME: ['cdn\\.net'] } },
+          Hosting: { dns: { SOA: ['hosting\\.com'] } },
+        })
+      )
+      expect(observation.dns).toEqual(
+        new Map([
+          ['MX', ['10 aspmx.l.google.com', '20 alt1.aspmx.l.google.com']],
+          ['TXT', ['v=spf1 include:_spf.google.com ~all']],
+          ['CNAME', ['example.cdn.net']],
+        ])
+      )
+      expect(resolved.toSorted()).toEqual([
+        'CNAME www.example.com',
+        'MX example.com',
+        'SOA example.com',
+        'TXT example.com',
+      ])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('resolves no dns records the catalog does not ask for', () => {
+    const { layer, resolved } = site({
+      'https://example.com/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { html: ['example'] } })
+      )
+      expect(observation.dns).toEqual(new Map())
+      expect(resolved).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('resolves no dns records for an ip address', () => {
+    const { layer, resolved } = site({
+      'http://127.0.0.1/': () => new Response(''),
+      'http://[::1]/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      const requirements = requirementsOf({ Example: { dns: { NS: ['ns'] } } })
+      yield* Collector.collect('http://127.0.0.1/', requirements)
+      yield* Collector.collect('http://[::1]/', requirements)
+      expect(resolved).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('ignores dns records that cannot be resolved', () => {
+    const { layer } = site(
+      { 'https://example.com/': () => new Response('page') },
+      {
+        'example.com': {
+          NS: new Error('queryNs ETIMEOUT example.com'),
+          TXT: ['v=spf1'],
+        },
+      }
+    )
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { dns: { NS: ['ns'], TXT: ['spf'] } } })
+      )
+      expect(observation.html).toEqual(['page'])
+      expect(observation.dns).toEqual(new Map([['TXT', ['v=spf1']]]))
+    }).pipe(Effect.provide(layer))
+  })
+
   it.effect('sends no tracing headers to the site', () => {
     const { layer, headers } = site({
       'https://example.com/': () => new Response(''),
@@ -296,7 +408,7 @@ describe('Collector.collect', () => {
   })
 
   it.effect('loads the page through the Page service', () => {
-    const { clientLayer } = site({})
+    const { clientLayer, resolverLayer } = site({})
     return Effect.gen(function* () {
       const observation = yield* Collector.collect(
         'https://example.com/',
@@ -316,7 +428,7 @@ describe('Collector.collect', () => {
             }),
         })
       ),
-      Effect.provide(clientLayer)
+      Effect.provide(Layer.merge(clientLayer, resolverLayer))
     )
   })
 })
@@ -340,6 +452,22 @@ describe('Collector.detect', () => {
       expect(
         detections.map(({ technology, version }) => [technology.name, version])
       ).toEqual([['Example', '2.1']])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('detects a technology by its dns records', () => {
+    const { layer } = site(
+      { 'https://example.com/': () => new Response('') },
+      { 'example.com': { MX: ['10 mx.mail.example.net'] } }
+    )
+    return Effect.gen(function* () {
+      const detections = yield* Collector.detect(
+        catalogOf({ Mail: { dns: { MX: ['\\.mail\\.example\\.net'] } } }),
+        'https://example.com/'
+      )
+      expect(detections.map(({ technology }) => technology.name)).toEqual([
+        'Mail',
+      ])
     }).pipe(Effect.provide(layer))
   })
 })
