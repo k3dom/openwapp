@@ -13,40 +13,25 @@
     "directory": "packages/fingerprints"
   },
   "files": [
-    "dist",
+    "data",
     "README.md"
   ],
   "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
   "exports": {
-    ".": "./dist/index.js",
+    "./*": "./data/*",
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
+    "sync": "scripts/sync.sh",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "lint": "oxlint",
-    "check": "pnpm run lint && pnpm run format:check"
+    "check": "pnpm run format:check"
   },
   "devDependencies": {
     "@openwapp/oxfmt": "workspace:*",
-    "@openwapp/oxlint": "workspace:*",
-    "@openwapp/tsconfig": "workspace:*",
-    "@openwapp/vitest": "workspace:*",
-    "@types/node": "26.6.1",
-    "@vitest/coverage-v8": "5.0.1",
-    "oxfmt": "0.68.0",
-    "oxlint": "1.82.0",
-    "oxlint-tsgolint": "7.0.2001",
-    "tsdown": "0.23.0",
-    "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "oxfmt": "0.68.0"
   }
 }

@@ -179,39 +179,9 @@ importers:
       '@openwapp/oxfmt':
         specifier: workspace:*
         version: link:../../tooling/oxfmt
-      '@openwapp/oxlint':
-        specifier: workspace:*
-        version: link:../../tooling/oxlint
-      '@openwapp/tsconfig':
-        specifier: workspace:*
-        version: link:../../tooling/tsconfig
-      '@openwapp/vitest':
-        specifier: workspace:*
-        version: link:../../tooling/vitest
-      '@types/node':
-        specifier: 26.6.1
-        version: 26.6.1
-      '@vitest/coverage-v8':
-        specifier: 5.0.1
-        version: 5.0.1(vitest@5.0.1)
       oxfmt:
         specifier: 0.68.0
         version: 0.68.0
-      oxlint:
-        specifier: 1.82.0
-        version: 1.82.0(oxlint-tsgolint@7.0.2001)
-      oxlint-tsgolint:
-        specifier: 7.0.2001
-        version: 7.0.2001
-      tsdown:
-        specifier: 0.23.0
-        version: 0.23.0(typescript@7.0.2)
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: 5.0.1
-        version: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.1(@types/node@26.6.1))
 
   packages/matcher:
     devDependencies:

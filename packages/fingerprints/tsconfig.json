@@ -1,8 +1,0 @@
-{
-  "extends": "@openwapp/tsconfig/base.json",
-  "include": ["src/**/*", "test/**/*", "*.config.ts"],
-  "exclude": ["dist", "coverage", "node_modules"],
-  "compilerOptions": {
-    "types": ["node"]
-  }
-}
