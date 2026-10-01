@@ -268,6 +268,40 @@ describe('Matcher.match', () => {
       }
     )
 
+    it('removes both of two equally confident technologies that exclude each other', () => {
+      expect(
+        detect(
+          {
+            Example: { url: ['example'], excludes: ['Other'] },
+            Other: { url: ['example'], excludes: ['Example'] },
+          },
+          { url: ['https://example.com/'] }
+        )
+      ).toEqual([])
+    })
+
+    it.each([
+      ['before', ['Excluder', 'Middle', 'Last']],
+      ['after', ['Middle', 'Excluder', 'Last']],
+    ])(
+      'applies the excludes of an excluded technology listed %s its excluder',
+      (_, order) => {
+        const fingerprints: Record<string, object> = {
+          Excluder: { url: ['example'], excludes: ['Middle'] },
+          Middle: { url: ['example'], excludes: ['Last'] },
+          Last: { url: ['example'] },
+        }
+        expect(
+          detect(
+            Object.fromEntries(
+              order.map((name) => [name, fingerprints[name] ?? {}])
+            ),
+            { url: ['https://example.com/'] }
+          )
+        ).toEqual([{ name: 'Excluder', confidence: 100 }])
+      }
+    )
+
     it('ignores the excludes of a zero confidence detection', () => {
       expect(
         detect(
@@ -483,6 +517,34 @@ describe('Matcher.match', () => {
           { url: ['/example/plugin/'] }
         ).map(({ name }) => name)
       ).toEqual(['Example', 'Plugin'])
+    })
+
+    it('lets a technology replace the technology it requires', () => {
+      expect(
+        detect(
+          {
+            Example: { url: ['example'] },
+            Plugin: { ...plugin, excludes: ['Example'] },
+          },
+          { url: ['/example/plugin/'] }
+        ).map(({ name }) => name)
+      ).toEqual(['Plugin'])
+    })
+
+    it('matches an implied technology without its requirements', () => {
+      expect(
+        detect(
+          {
+            Example: {},
+            Implier: { url: ['implier'], implies: ['Plugin'] },
+            Plugin: {
+              url: ['plugin/(\\d)\\;version:\\1'],
+              requires: ['Example'],
+            },
+          },
+          { url: ['/implier/plugin/2'] }
+        )
+      ).toContainEqual({ name: 'Plugin', confidence: 100, version: '2' })
     })
   })
 

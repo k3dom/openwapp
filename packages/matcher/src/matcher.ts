@@ -40,7 +40,7 @@ export const match = (
   catalog: Catalog.Catalog,
   observation: Observation.Observation
 ): ReadonlyArray<Detection> => {
-  const test = (
+  const execute = (
     { regex, confidence, version }: Pattern.Pattern,
     values: ReadonlyArray<string> = []
   ) => ({
@@ -55,32 +55,35 @@ export const match = (
     readonly version: Pattern.Version
     readonly matches: ReadonlyArray<ReadonlyArray<string | undefined>>
   }>({
-    Url: ({ pattern }) => test(pattern, observation.url),
-    Html: ({ pattern }) => test(pattern, observation.html),
-    Text: ({ pattern }) => test(pattern, observation.text),
-    Css: ({ pattern }) => test(pattern, observation.css),
-    Robots: ({ pattern }) => test(pattern, observation.robots),
-    Script: ({ pattern }) => test(pattern, observation.script),
-    ScriptSrc: ({ pattern }) => test(pattern, observation.scriptSrc),
-    Xhr: ({ pattern }) => test(pattern, observation.xhr),
-    CertIssuer: ({ pattern }) => test(pattern, observation.certIssuer),
-    Header: ({ name, pattern }) => test(pattern, observation.header.get(name)),
-    Cookie: ({ name, pattern }) => test(pattern, observation.cookie.get(name)),
-    Meta: ({ name, pattern }) => test(pattern, observation.meta.get(name)),
-    Js: ({ property, pattern }) => test(pattern, observation.js.get(property)),
-    Dns: ({ type, pattern }) => test(pattern, observation.dns.get(type)),
-    Probe: ({ path, pattern }) => test(pattern, observation.probe.get(path)),
+    Url: ({ pattern }) => execute(pattern, observation.url),
+    Html: ({ pattern }) => execute(pattern, observation.html),
+    Text: ({ pattern }) => execute(pattern, observation.text),
+    Css: ({ pattern }) => execute(pattern, observation.css),
+    Robots: ({ pattern }) => execute(pattern, observation.robots),
+    Script: ({ pattern }) => execute(pattern, observation.script),
+    ScriptSrc: ({ pattern }) => execute(pattern, observation.scriptSrc),
+    Xhr: ({ pattern }) => execute(pattern, observation.xhr),
+    CertIssuer: ({ pattern }) => execute(pattern, observation.certIssuer),
+    Header: ({ name, pattern }) =>
+      execute(pattern, observation.header.get(name)),
+    Cookie: ({ name, pattern }) =>
+      execute(pattern, observation.cookie.get(name)),
+    Meta: ({ name, pattern }) => execute(pattern, observation.meta.get(name)),
+    Js: ({ property, pattern }) =>
+      execute(pattern, observation.js.get(property)),
+    Dns: ({ type, pattern }) => execute(pattern, observation.dns.get(type)),
+    Probe: ({ path, pattern }) => execute(pattern, observation.probe.get(path)),
     DomExists: ({ selector, confidence, version }) => ({
       confidence,
       version,
       matches: observation.domExists.has(selector) ? [[]] : [],
     }),
     DomText: ({ selector, pattern }) =>
-      test(pattern, observation.domText.get(selector)),
+      execute(pattern, observation.domText.get(selector)),
     DomAttribute: ({ selector, attribute, pattern }) =>
-      test(pattern, observation.domAttribute.get(selector)?.get(attribute)),
+      execute(pattern, observation.domAttribute.get(selector)?.get(attribute)),
     DomProperty: ({ selector, property, pattern }) =>
-      test(pattern, observation.domProperty.get(selector)?.get(property)),
+      execute(pattern, observation.domProperty.get(selector)?.get(property)),
   })
 
   const evidence = new Map<string, Evidence>()
@@ -90,14 +93,13 @@ export const match = (
     const categories = new Set(
       [...detected.values()].flatMap(({ technology }) => technology.categories)
     )
+    const satisfied = Technology.Prerequisite.match({
+      Technology: ({ name }) => detected.has(name),
+      Category: ({ id }) => categories.has(id),
+    })
     const ready = [...waiting].filter(
-      ({ requires }) =>
-        requires.length === 0 ||
-        requires.some((prerequisite) =>
-          prerequisite._tag === 'Technology'
-            ? detected.has(prerequisite.name)
-            : categories.has(prerequisite.id)
-        )
+      ({ name, requires }) =>
+        requires.length === 0 || detected.has(name) || requires.some(satisfied)
     )
     if (ready.length === 0) break
 
@@ -119,17 +121,24 @@ export const match = (
       })
     }
 
-    const ranked = [...evidence.values()]
-      .filter(({ confidence }) => confidence > 0)
-      .toSorted((a, b) => b.confidence - a.confidence)
-    const excluded = new Set<string>()
-    for (const { technology } of ranked) {
-      if (excluded.has(technology.name)) continue
-      for (const name of technology.excludes) excluded.add(name)
-    }
+    const present = [...evidence.values()].filter(
+      ({ confidence }) => confidence > 0
+    )
+    const excluded = new Set(
+      present.flatMap(({ technology, confidence }) =>
+        technology.excludes.filter((name) => {
+          const other = evidence.get(name)
+          return !(
+            other !== undefined &&
+            other.confidence > confidence &&
+            other.technology.excludes.includes(technology.name)
+          )
+        })
+      )
+    )
 
     detected = new Map(
-      ranked
+      present
         .filter(({ technology }) => !excluded.has(technology.name))
         .map((entry) => [entry.technology.name, entry])
     )
