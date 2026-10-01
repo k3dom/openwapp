@@ -11,13 +11,15 @@ import {
   Requirements,
   type Rule,
 } from '@openwapp/matcher'
-import { Effect, Layer } from 'effect'
+import { Deferred, Effect, Fiber, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
 import {
   HttpClient,
   HttpClientError,
   HttpClientResponse,
 } from 'effect/unstable/http'
 
+import * as Certificate from '#/certificate.ts'
 import * as Collector from '#/collector.ts'
 import * as Page from '#/page.ts'
 import * as Resolver from '#/resolver.ts'
@@ -39,10 +41,16 @@ const requirementsOf = (technologies: Record<string, object>) =>
 
 const site = (
   routes: Record<string, () => Response | Error>,
-  records: Record<
-    string,
-    Partial<Record<Rule.DnsRecordType, ReadonlyArray<string> | Error>>
-  > = {}
+  {
+    records = {},
+    issuers = {},
+  }: {
+    readonly records?: Record<
+      string,
+      Partial<Record<Rule.DnsRecordType, ReadonlyArray<string> | Error>>
+    >
+    readonly issuers?: Record<string, () => string | Error>
+  } = {}
 ) => {
   const resolved: Array<string> = []
   const resolverLayer = Layer.succeed(Resolver.Resolver, {
@@ -57,6 +65,7 @@ const site = (
     },
   })
   const requested: Array<string> = []
+  const certificateRequests: Array<string> = []
   const headers: Array<Record<string, string>> = []
   const client = HttpClient.make((request, url) => {
     requested.push(url.href)
@@ -74,15 +83,28 @@ const site = (
       : Effect.succeed(HttpClientResponse.fromWeb(request, response))
   })
   const clientLayer = Layer.succeed(HttpClient.HttpClient, client)
+  const certificateLayer = Layer.succeed(Certificate.Certificate, {
+    issuer: (url) => {
+      certificateRequests.push(url.href)
+      const issuer =
+        issuers[url.origin]?.() ?? new Error('certificate unavailable')
+      return issuer instanceof Error
+        ? Effect.fail(
+            new Certificate.CertificateError({ url: url.href, cause: issuer })
+          )
+        : Effect.succeed(issuer)
+    },
+  })
   return {
     requested,
     headers,
+    certificateRequests,
     resolved,
     clientLayer,
+    certificateLayer,
     resolverLayer,
-    layer: Layer.mergeAll(
-      Page.layerHttp.pipe(Layer.provideMerge(clientLayer)),
-      resolverLayer
+    layer: Layer.mergeAll(Page.layerHttp, certificateLayer, resolverLayer).pipe(
+      Layer.provideMerge(clientLayer)
     ),
   }
 }
@@ -260,6 +282,96 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect(
+    'observes the certificate issuer only when the catalog has certIssuer rules',
+    () => {
+      const { layer, certificateRequests } = site(
+        { 'https://example.com/': () => new Response('') },
+        { issuers: { 'https://example.com': () => 'O=Example CA' } }
+      )
+      return Effect.gen(function* () {
+        const without = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({ Example: { html: ['example'] } })
+        )
+        expect(without.certIssuer).toEqual([])
+        expect(certificateRequests).toEqual([])
+
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({ Example: { certIssuer: 'Example CA' } })
+        )
+        expect(observation.certIssuer).toEqual(['O=Example CA'])
+        expect(certificateRequests).toEqual(['https://example.com/'])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect(
+    'looks up everything besides the page on the site it was redirected to',
+    () => {
+      const { layer, requested, resolved, certificateRequests } = site(
+        {
+          'http://example.com/': () =>
+            new Response(null, {
+              status: 301,
+              headers: { location: 'https://www.example.org/' },
+            }),
+          'https://www.example.org/': () => new Response(''),
+          'https://www.example.org/robots.txt': () =>
+            new Response('Disallow: /x/'),
+        },
+        {
+          records: { 'example.org': { MX: ['10 mx.example.org'] } },
+          issuers: { 'https://www.example.org': () => 'O=Example CA' },
+        }
+      )
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'http://example.com/',
+          requirementsOf({
+            Example: {
+              robots: ['Disallow'],
+              probe: { '/version': '' },
+              dns: { MX: ['example'], CNAME: ['cdn'] },
+              certIssuer: 'Example CA',
+            },
+          })
+        )
+        expect(observation.robots).toEqual(['Disallow: /x/'])
+        expect(observation.dns).toEqual(
+          new Map([['MX', ['10 mx.example.org']]])
+        )
+        expect(observation.certIssuer).toEqual(['O=Example CA'])
+        expect(requested.toSorted()).toEqual([
+          'http://example.com/',
+          'https://www.example.org/',
+          'https://www.example.org/robots.txt',
+          'https://www.example.org/version',
+        ])
+        expect(resolved.toSorted()).toEqual([
+          'CNAME www.example.org',
+          'MX example.org',
+        ])
+        expect(certificateRequests).toEqual(['https://www.example.org/'])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect('reads no certificate for a page served over plain http', () => {
+    const { layer, certificateRequests } = site({
+      'http://example.com/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'http://example.com/',
+        requirementsOf({ Example: { certIssuer: 'Example CA' } })
+      )
+      expect(observation.certIssuer).toEqual([])
+      expect(certificateRequests).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
   it.effect('ignores failures of requests besides the page', () => {
     const { layer } = site({
       'https://example.com/': () => new Response('page'),
@@ -270,12 +382,17 @@ describe('Collector.collect', () => {
       const observation = yield* Collector.collect(
         'https://example.com/',
         requirementsOf({
-          Example: { robots: ['Disallow'], probe: { '/version': '' } },
+          Example: {
+            robots: ['Disallow'],
+            probe: { '/version': '' },
+            certIssuer: 'Example',
+          },
         })
       )
       expect(observation.html).toEqual(['page'])
       expect(observation.robots).toEqual([])
       expect(observation.probe).toEqual(new Map())
+      expect(observation.certIssuer).toEqual([])
     }).pipe(Effect.provide(layer))
   })
 
@@ -283,11 +400,13 @@ describe('Collector.collect', () => {
     const { layer, resolved } = site(
       { 'https://www.example.com/': () => new Response('') },
       {
-        'example.com': {
-          MX: ['10 aspmx.l.google.com', '20 alt1.aspmx.l.google.com'],
-          TXT: ['v=spf1 include:_spf.google.com ~all'],
+        records: {
+          'example.com': {
+            MX: ['10 aspmx.l.google.com', '20 alt1.aspmx.l.google.com'],
+            TXT: ['v=spf1 include:_spf.google.com ~all'],
+          },
+          'www.example.com': { CNAME: ['example.cdn.net'] },
         },
-        'www.example.com': { CNAME: ['example.cdn.net'] },
       }
     )
     return Effect.gen(function* () {
@@ -346,9 +465,11 @@ describe('Collector.collect', () => {
     const { layer } = site(
       { 'https://example.com/': () => new Response('page') },
       {
-        'example.com': {
-          NS: new Error('queryNs ETIMEOUT example.com'),
-          TXT: ['v=spf1'],
+        records: {
+          'example.com': {
+            NS: new Error('queryNs ETIMEOUT example.com'),
+            TXT: ['v=spf1'],
+          },
         },
       }
     )
@@ -361,6 +482,62 @@ describe('Collector.collect', () => {
       expect(observation.dns).toEqual(new Map([['TXT', ['v=spf1']]]))
     }).pipe(Effect.provide(layer))
   })
+
+  it.effect('leaves out lookups that take longer than 10 seconds', () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      let pending = 4
+      const hang = Effect.suspend(() => {
+        pending -= 1
+        if (pending === 0) Deferred.doneUnsafe(started, Effect.void)
+        return Effect.never
+      })
+      const fiber = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({
+          Example: {
+            robots: ['Disallow'],
+            probe: { '/version': '' },
+            dns: { TXT: ['spf'] },
+            certIssuer: 'Example',
+          },
+        })
+      ).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            Page.layerHttp,
+            Layer.succeed(Certificate.Certificate, { issuer: () => hang }),
+            Layer.succeed(Resolver.Resolver, { resolve: () => hang })
+          ).pipe(
+            Layer.provideMerge(
+              Layer.succeed(
+                HttpClient.HttpClient,
+                HttpClient.make((request, url) =>
+                  url.pathname === '/'
+                    ? Effect.succeed(
+                        HttpClientResponse.fromWeb(
+                          request,
+                          new Response('page')
+                        )
+                      )
+                    : hang
+                )
+              )
+            )
+          )
+        ),
+        Effect.forkChild
+      )
+      yield* Deferred.await(started)
+      yield* TestClock.adjust('10 seconds')
+      const observation = yield* Fiber.join(fiber)
+      expect(observation.html).toEqual(['page'])
+      expect(observation.robots).toEqual([])
+      expect(observation.probe).toEqual(new Map())
+      expect(observation.dns).toEqual(new Map())
+      expect(observation.certIssuer).toEqual([])
+    })
+  )
 
   it.effect('sends no tracing headers to the site', () => {
     const { layer, headers } = site({
@@ -408,7 +585,7 @@ describe('Collector.collect', () => {
   })
 
   it.effect('loads the page through the Page service', () => {
-    const { clientLayer, resolverLayer } = site({})
+    const { clientLayer, certificateLayer, resolverLayer } = site({})
     return Effect.gen(function* () {
       const observation = yield* Collector.collect(
         'https://example.com/',
@@ -428,7 +605,9 @@ describe('Collector.collect', () => {
             }),
         })
       ),
-      Effect.provide(Layer.merge(clientLayer, resolverLayer))
+      Effect.provide(
+        Layer.mergeAll(clientLayer, certificateLayer, resolverLayer)
+      )
     )
   })
 })
@@ -458,7 +637,7 @@ describe('Collector.detect', () => {
   it.effect('detects a technology by its dns records', () => {
     const { layer } = site(
       { 'https://example.com/': () => new Response('') },
-      { 'example.com': { MX: ['10 mx.mail.example.net'] } }
+      { records: { 'example.com': { MX: ['10 mx.mail.example.net'] } } }
     )
     return Effect.gen(function* () {
       const detections = yield* Collector.detect(

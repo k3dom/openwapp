@@ -83,7 +83,7 @@ export const layerNode: Layer.Layer<Resolver> = Layer.succeed(
     resolve: Effect.fn('Resolver.resolve')(function* (hostname, type) {
       return yield* Effect.tryPromise({
         try: (signal) => {
-          const resolver = new Dns.Resolver({ timeout: 2000, tries: 2 })
+          const resolver = new Dns.Resolver()
           resolver.setServers(Dns.getServers())
           signal.addEventListener('abort', () => resolver.cancel())
           return lookups[type](resolver, hostname).catch((error: unknown) => {
