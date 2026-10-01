@@ -33,12 +33,4 @@ It consists of three parts:
 
 The `Observation` links the three steps. `Requirements` tells the collector
 which of its fields to fill, the collector fills them and `Matcher` tests each
-rule against the field named after its tag. Fields without a key, such as `url`
-or `scriptSrc`, hold a list of values. Keyed fields, such as `header` or `dns`,
-map each key to its values, keyed the same way as the rules, so `probe` is keyed
-by path. A key is present only when something was found, and then it holds at
-least one value. Rules with an empty pattern therefore match on presence alone.
-The collector turns JS and DOM property values into strings with `String`.
-`domAttribute` and `domProperty` are keyed by selector, then by attribute or
-property. `domExists` holds the selectors that matched. Every field defaults to
-empty, so the collector only fills what it gathered.
+rule against the field named after its tag.
