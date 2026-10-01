@@ -74,6 +74,9 @@ export const collect = Effect.fn('Collector.collect')(
                 (type) =>
                   optional(
                     resolver.resolve(
+                      // Mail, verification and name server records usually
+                      // sit on the apex domain, while address records belong
+                      // to the exact host.
                       type === 'A' || type === 'AAAA' || type === 'CNAME'
                         ? site.hostname
                         : site.hostname.replace(/^www\./, ''),

@@ -89,6 +89,9 @@ export const layerNodeOptions = ({ servers, ...options }: NodeOptions = {}) =>
       resolve: Effect.fn('Resolver.resolve')((hostname, type) =>
         Effect.tryPromise({
           try: (signal) => {
+            // One resolver per lookup, since cancel aborts all of its queries.
+            // A new resolver ignores servers set with Dns.setServers, so they
+            // are copied.
             const resolver = new Dns.Resolver(options)
             resolver.setServers(servers ?? Dns.getServers())
             signal.addEventListener('abort', () => resolver.cancel())
