@@ -4,7 +4,7 @@ import {
   Observation,
   Requirements,
 } from '@openwapp/matcher'
-import { Array, Effect, Layer, Option } from 'effect'
+import { Array, Cause, Effect, Exit, Layer, Option } from 'effect'
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 
 import * as Certificate from '#/certificate.ts'
@@ -103,11 +103,19 @@ export const collectPromise = (
   requirements: Requirements.Requirements,
   options?: PromiseOptions
 ) =>
-  Effect.runPromise(
+  Effect.runPromiseExit(
     collect(url, requirements).pipe(Effect.provide(layer)),
     options
-  ).catch((error: unknown) =>
-    Promise.reject(options?.signal?.aborted ? options.signal.reason : error)
+  ).then(
+    Exit.match({
+      onSuccess: (observation) => observation,
+      onFailure: (cause) =>
+        Promise.reject(
+          options?.signal?.aborted && Cause.hasInterruptsOnly(cause)
+            ? options.signal.reason
+            : Cause.squash(cause)
+        ),
+    })
   )
 
 export const detect = Effect.fn('Collector.detect')(function* (
