@@ -33,6 +33,15 @@ Issues live as GitHub issues in `k3dom/openwapp`, managed via the `gh` CLI. See
 The five canonical triage roles, each label string equal to its name. See
 `docs/agents/triage-labels.md`.
 
+## Vendored Repositories
+
+This project vendors external repositories of key libraries as git subtrees
+under `.agents/repos/`. Use vendored repositories as read-only reference
+material when working with related libraries to explore APIs, find usage
+examples, and understand implementation details.
+
+- Effect-TS (`.agents/repos/effect/`)
+
 ## Rules
 
 Do not read git stashes unless explicitly instructed.
