@@ -1,4 +1,4 @@
-import { Schema, SchemaGetter } from 'effect'
+import { Schema, SchemaGetter, Struct } from 'effect'
 
 export class Category extends Schema.Class<Category>(
   '@openwapp/matcher/category/Category'
@@ -11,11 +11,7 @@ export class Category extends Schema.Class<Category>(
 
 export const FromJson = Schema.Record(
   Schema.String,
-  Schema.Struct({
-    name: Schema.String,
-    priority: Schema.Int,
-    groups: Schema.Array(Schema.Int),
-  })
+  Schema.Struct(Struct.omit(Category.fields, ['id']))
 ).pipe(
   Schema.decodeTo(Schema.ReadonlyMap(Schema.Int, Category), {
     decode: SchemaGetter.transform(

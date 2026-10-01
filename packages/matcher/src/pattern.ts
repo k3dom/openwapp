@@ -46,7 +46,7 @@ export const TaggedString = Schema.String.pipe(
               /^(.*?)\\(\d)\?([^:]*):(.*)$/s.exec(template) ?? []
             const parts = head
               .split(/\\(\d)/)
-              .flatMap((text, index): Array<VersionPart> => {
+              .flatMap((text, index): ReadonlyArray<VersionPart> => {
                 if (index % 2 === 1) {
                   return [{ _tag: 'Capture', group: Number(text) }]
                 }

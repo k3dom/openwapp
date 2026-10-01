@@ -1,4 +1,4 @@
-import { Schema, SchemaGetter } from 'effect'
+import { Schema, SchemaGetter, Struct } from 'effect'
 
 export class Group extends Schema.Class<Group>('@openwapp/matcher/group/Group')(
   {
@@ -9,7 +9,7 @@ export class Group extends Schema.Class<Group>('@openwapp/matcher/group/Group')(
 
 export const FromJson = Schema.Record(
   Schema.String,
-  Schema.Struct({ name: Schema.String })
+  Schema.Struct(Struct.omit(Group.fields, ['id']))
 ).pipe(
   Schema.decodeTo(Schema.ReadonlyMap(Schema.Int, Group), {
     decode: SchemaGetter.transform(

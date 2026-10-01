@@ -1,4 +1,4 @@
-import { Schema, SchemaGetter } from 'effect'
+import { Array, Effect, Schema, SchemaGetter, Struct } from 'effect'
 
 import * as Pattern from '#/pattern.ts'
 import * as Rule from '#/rule.ts'
@@ -91,13 +91,7 @@ const Selectors = Schema.Array(Pattern.TaggedString).pipe(
 )
 
 const Dom = Schema.Union([
-  Schema.String.pipe(
-    Schema.decodeTo(Selectors, {
-      decode: SchemaGetter.transform((selector) => [selector]),
-      encode: SchemaGetter.forbiddenEncoding,
-    })
-  ),
-  Selectors,
+  Schema.toCodecArrayFromSingle(Selectors),
   Schema.Record(
     Schema.String,
     Schema.Struct({
@@ -123,20 +117,18 @@ const Dom = Schema.Union([
           ([
             selector,
             { exists, text, attributes = {}, properties = {} },
-          ]): Array<Rule.Rule> => [
-            ...(exists === undefined
-              ? []
-              : [
-                  {
-                    _tag: 'DomExists' as const,
-                    selector,
-                    confidence: exists.confidence,
-                    version: exists.version,
-                  },
-                ]),
-            ...(text === undefined
-              ? []
-              : [{ _tag: 'DomText' as const, selector, pattern: text }]),
+          ]): ReadonlyArray<Rule.Rule> => [
+            ...Array.fromNullishOr(exists).map(({ confidence, version }) => ({
+              _tag: 'DomExists' as const,
+              selector,
+              confidence,
+              version,
+            })),
+            ...Array.fromNullishOr(text).map((pattern) => ({
+              _tag: 'DomText' as const,
+              selector,
+              pattern,
+            })),
             ...Object.entries(attributes).map(([attribute, pattern]) => ({
               _tag: 'DomAttribute' as const,
               selector,
@@ -157,104 +149,97 @@ const Dom = Schema.Union([
   ),
 ])
 
+const sources = {
+  url: patterns((pattern) => ({ _tag: 'Url', pattern })),
+  html: patterns((pattern) => ({ _tag: 'Html', pattern })),
+  text: patterns((pattern) => ({ _tag: 'Text', pattern })),
+  css: patterns((pattern) => ({ _tag: 'Css', pattern })),
+  robots: patterns((pattern) => ({ _tag: 'Robots', pattern })),
+  scripts: patterns((pattern) => ({ _tag: 'Script', pattern })),
+  scriptSrc: patterns((pattern) => ({ _tag: 'ScriptSrc', pattern })),
+  xhr: patterns((pattern) => ({ _tag: 'Xhr', pattern })),
+  certIssuer: Pattern.FromString.pipe(
+    Schema.decodeTo(Rules, {
+      decode: SchemaGetter.transform((pattern) => [
+        { _tag: 'CertIssuer' as const, pattern },
+      ]),
+      encode: SchemaGetter.forbiddenEncoding,
+    })
+  ),
+  headers: keyedPatterns((name, pattern) => ({
+    _tag: 'Header',
+    name: name.toLowerCase(),
+    pattern,
+  })),
+  cookies: keyedPatterns((name, pattern) => ({
+    _tag: 'Cookie',
+    name: name.toLowerCase(),
+    pattern,
+  })),
+  meta: keyedPatterns((name, pattern) => ({
+    _tag: 'Meta',
+    name: name.toLowerCase(),
+    pattern,
+  })),
+  js: keyedPatterns((property, pattern) => ({
+    _tag: 'Js',
+    property,
+    pattern,
+  })),
+  probe: keyedPatterns((path, pattern) => ({
+    _tag: 'Probe',
+    path,
+    pattern,
+  })),
+  dns: Schema.Record(
+    Rule.DnsRecordType,
+    Schema.optionalKey(Schema.Array(Pattern.FromString))
+  ).pipe(
+    Schema.decodeTo(Rules, {
+      decode: SchemaGetter.transform((records) =>
+        Rule.DnsRecordType.literals.flatMap((type) =>
+          (records[type] ?? []).map((pattern) => ({
+            _tag: 'Dns' as const,
+            type,
+            pattern,
+          }))
+        )
+      ),
+      encode: SchemaGetter.forbiddenEncoding,
+    })
+  ),
+  dom: Dom,
+}
+
 const Fingerprint = Schema.Struct({
-  description: Schema.optionalKey(Schema.String),
-  website: Schema.String,
-  icon: Schema.optionalKey(Schema.String),
-  cpe: Schema.optionalKey(Schema.String),
-  saas: Schema.optionalKey(Schema.Boolean),
-  oss: Schema.optionalKey(Schema.Boolean),
-  pricing: Schema.optionalKey(Schema.Array(Pricing)),
-  cats: Schema.NonEmptyArray(Schema.Int),
-  implies: Schema.optionalKey(
-    Schema.Array(
-      Pattern.TaggedString.pipe(
-        Schema.decodeTo(Implication, {
-          decode: SchemaGetter.transform(({ value, confidence, version }) => ({
-            name: value,
-            confidence,
-            version,
-          })),
-          encode: SchemaGetter.forbiddenEncoding,
-        })
-      )
+  ...Struct.pick(Technology.fields, [
+    'description',
+    'website',
+    'icon',
+    'cpe',
+    'saas',
+    'oss',
+    'categories',
+  ]),
+  pricing: Schema.Array(Pricing).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([]))
+  ),
+  implies: Schema.Array(
+    Pattern.TaggedString.pipe(
+      Schema.decodeTo(Implication.pipe(Schema.encodeKeys({ name: 'value' })))
     )
+  ).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  excludes: Schema.Array(TechnologyName).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([]))
   ),
-  excludes: Schema.optionalKey(Schema.Array(TechnologyName)),
-  requires: Schema.optionalKey(Schema.Array(TechnologyName)),
-  requiresCategory: Schema.optionalKey(Schema.Array(Schema.Int)),
-  url: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Url', pattern }))),
-  html: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Html', pattern }))),
-  text: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Text', pattern }))),
-  css: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Css', pattern }))),
-  robots: Schema.optionalKey(
-    patterns((pattern) => ({ _tag: 'Robots', pattern }))
+  requires: Schema.Array(TechnologyName).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([]))
   ),
-  scripts: Schema.optionalKey(
-    patterns((pattern) => ({ _tag: 'Script', pattern }))
+  requiresCategory: Schema.Array(Schema.Int).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([]))
   ),
-  scriptSrc: Schema.optionalKey(
-    patterns((pattern) => ({ _tag: 'ScriptSrc', pattern }))
-  ),
-  xhr: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Xhr', pattern }))),
-  certIssuer: Schema.optionalKey(
-    Pattern.FromString.pipe(
-      Schema.decodeTo(Rules, {
-        decode: SchemaGetter.transform((pattern) => [
-          { _tag: 'CertIssuer' as const, pattern },
-        ]),
-        encode: SchemaGetter.forbiddenEncoding,
-      })
-    )
-  ),
-  headers: Schema.optionalKey(
-    keyedPatterns((name, pattern) => ({
-      _tag: 'Header',
-      name: name.toLowerCase(),
-      pattern,
-    }))
-  ),
-  cookies: Schema.optionalKey(
-    keyedPatterns((name, pattern) => ({
-      _tag: 'Cookie',
-      name: name.toLowerCase(),
-      pattern,
-    }))
-  ),
-  meta: Schema.optionalKey(
-    keyedPatterns((name, pattern) => ({
-      _tag: 'Meta',
-      name: name.toLowerCase(),
-      pattern,
-    }))
-  ),
-  js: Schema.optionalKey(
-    keyedPatterns((property, pattern) => ({ _tag: 'Js', property, pattern }))
-  ),
-  probe: Schema.optionalKey(
-    keyedPatterns((path, pattern) => ({ _tag: 'Probe', path, pattern }))
-  ),
-  dns: Schema.optionalKey(
-    Schema.Record(
-      Rule.DnsRecordType,
-      Schema.optionalKey(Schema.Array(Pattern.FromString))
-    ).pipe(
-      Schema.decodeTo(Rules, {
-        decode: SchemaGetter.transform((records) =>
-          Rule.DnsRecordType.literals.flatMap((type) =>
-            (records[type] ?? []).map((pattern) => ({
-              _tag: 'Dns' as const,
-              type,
-              pattern,
-            }))
-          )
-        ),
-        encode: SchemaGetter.forbiddenEncoding,
-      })
-    )
-  ),
-  dom: Schema.optionalKey(Dom),
-})
+  ...Struct.map(sources, Schema.optionalKey),
+}).pipe(Schema.encodeKeys({ categories: 'cats' }))
 
 export const FromJson = Schema.Record(Schema.String, Fingerprint).pipe(
   Schema.decodeTo(Schema.ReadonlyMap(Schema.String, Technology), {
@@ -262,60 +247,14 @@ export const FromJson = Schema.Record(Schema.String, Fingerprint).pipe(
       (fingerprints) =>
         new Map(
           Object.entries(fingerprints).map(
-            ([
-              name,
-              {
-                pricing = [],
-                cats,
-                implies = [],
-                excludes = [],
-                requires = [],
-                requiresCategory = [],
-                url = [],
-                html = [],
-                text = [],
-                css = [],
-                robots = [],
-                scripts = [],
-                scriptSrc = [],
-                xhr = [],
-                certIssuer = [],
-                headers = [],
-                cookies = [],
-                meta = [],
-                js = [],
-                probe = [],
-                dns = [],
-                dom = [],
-                ...metadata
-              },
-            ]) => [
+            ([name, { requires, requiresCategory, ...fingerprint }]) => [
               name,
               {
                 name,
-                ...metadata,
-                pricing,
-                categories: cats,
-                rules: [
-                  ...url,
-                  ...html,
-                  ...text,
-                  ...css,
-                  ...robots,
-                  ...scripts,
-                  ...scriptSrc,
-                  ...xhr,
-                  ...certIssuer,
-                  ...headers,
-                  ...cookies,
-                  ...meta,
-                  ...js,
-                  ...probe,
-                  ...dns,
-                  ...dom,
-                ],
-                implies,
-                excludes,
+                ...Struct.omit(fingerprint, Struct.keys(sources)),
+                rules: Struct.keys(sources).flatMap(
+                  (key) => fingerprint[key] ?? []
+                ),
                 requires: [
                   ...requires.map((name) => ({
                     _tag: 'Technology' as const,
