@@ -1,6 +1,7 @@
 export * as Catalog from '#/catalog.ts'
 export * as Category from '#/category.ts'
 export * as Group from '#/group.ts'
+export * as Matcher from '#/matcher.ts'
 export * as Observation from '#/observation.ts'
 export * as Pattern from '#/pattern.ts'
 export * as Rule from '#/rule.ts'

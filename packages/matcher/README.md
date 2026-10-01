@@ -89,6 +89,22 @@ const observation = new Observation.Observation({
 })
 ```
 
+### Matcher
+
+`Matcher.match` returns a `Detection` for every technology found in the
+observation.
+
+```ts
+import { Matcher } from '@openwapp/matcher'
+
+for (const { technology, confidence, version } of Matcher.match(
+  catalog,
+  observation
+)) {
+  console.log(technology.name, version, confidence)
+}
+```
+
 ## License
 
 MIT. The matcher ships without fingerprint data. Install
