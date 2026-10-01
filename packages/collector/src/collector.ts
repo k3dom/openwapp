@@ -5,7 +5,11 @@ import {
   Requirements,
 } from '@openwapp/matcher'
 import { Array, Effect, Layer } from 'effect'
-import { FetchHttpClient, HttpClient } from 'effect/unstable/http'
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientRequest,
+} from 'effect/unstable/http'
 
 import * as Page from '#/page.ts'
 
@@ -31,11 +35,13 @@ export const collect = Effect.fn('Collector.collect')(
     })
     const page = yield* Page.Page
     const client = (yield* HttpClient.HttpClient).pipe(
+      HttpClient.mapRequest(HttpClientRequest.prependUrl(target.origin)),
       HttpClient.followRedirects(),
       HttpClient.filterStatusOk
     )
+
     const fetchText = (path: string) =>
-      client.get(new URL(path.replace(/^\/*/, '/'), target)).pipe(
+      client.get(path).pipe(
         Effect.flatMap((response) => response.text),
         Effect.tapError(Effect.logDebug)
       )

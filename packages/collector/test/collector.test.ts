@@ -213,15 +213,18 @@ describe('Collector.collect', () => {
       yield* Collector.collect(
         'https://example.com/shop/',
         requirementsOf({
-          Example: { probe: { version: '', '//other.example/x': '' } },
+          Example: {
+            probe: {
+              version: '',
+              '//other.example/a': '',
+              '/\\other.example/b': '',
+              '/\\[': '',
+            },
+          },
         })
       )
-      expect(requested).toEqual(
-        expect.arrayContaining([
-          'https://example.com/version',
-          'https://example.com/other.example/x',
-        ])
-      )
+      expect(requested).toContain('https://example.com/version')
+      expect(requested).toHaveLength(5)
       expect(
         requested.filter((url) => !url.startsWith('https://example.com/'))
       ).toEqual([])
