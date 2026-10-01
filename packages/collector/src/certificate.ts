@@ -1,7 +1,7 @@
-import { isIP } from 'node:net'
 import * as Tls from 'node:tls'
 
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Context, Effect, Layer, Result, Schema } from 'effect'
+import { NetAddress } from 'effect/net'
 
 export class CertificateError extends Schema.TaggedError<CertificateError>(
   '@openwapp/collector/certificate/CertificateError'
@@ -32,7 +32,10 @@ export const layerNode = Layer.succeed(
             return Tls.connect({
               host,
               port: Number(url.port) || 443,
-              servername: isIP(host) === 0 ? host : undefined,
+              servername: Result.match(NetAddress.ipFromString(host), {
+                onSuccess: () => undefined,
+                onFailure: () => host,
+              }),
               rejectUnauthorized: false,
             })
           }),

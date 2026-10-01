@@ -4,8 +4,9 @@ import {
   Observation,
   Requirements,
 } from '@openwapp/matcher'
-import { Array, Cause, Effect, Exit, Layer, Option } from 'effect'
+import { Array, Cause, Effect, Exit, Layer, Option, Result } from 'effect'
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
+import { NetAddress } from 'effect/net'
 
 import * as Certificate from '#/certificate.ts'
 import * as Page from '#/page.ts'
@@ -62,28 +63,33 @@ export const collect = Effect.fn('Collector.collect')(
             ),
           { concurrency: 'unbounded' }
         ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
-        dns: /^\[|^[\d.]+$/.test(site.hostname)
-          ? Effect.succeed(new Map())
-          : Effect.forEach(
-              requirements.dns,
-              (type) =>
-                optional(
-                  resolver.resolve(
-                    type === 'A' || type === 'AAAA' || type === 'CNAME'
-                      ? site.hostname
-                      : site.hostname.replace(/^www\./, ''),
-                    type
-                  )
-                ).pipe(
-                  Effect.map((records) =>
-                    records.pipe(
-                      Option.filter(Array.isReadonlyArrayNonEmpty),
-                      Option.map((records) => [type, records] as const)
+        dns: Result.match(
+          NetAddress.ipFromString(site.hostname.replace(/^\[|\]$/g, '')),
+          {
+            onSuccess: () => Effect.succeed(new Map()),
+            onFailure: () =>
+              Effect.forEach(
+                requirements.dns,
+                (type) =>
+                  optional(
+                    resolver.resolve(
+                      type === 'A' || type === 'AAAA' || type === 'CNAME'
+                        ? site.hostname
+                        : site.hostname.replace(/^www\./, ''),
+                      type
                     )
-                  )
-                ),
-              { concurrency: 'unbounded' }
-            ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
+                  ).pipe(
+                    Effect.map((records) =>
+                      records.pipe(
+                        Option.filter(Array.isReadonlyArrayNonEmpty),
+                        Option.map((records) => [type, records] as const)
+                      )
+                    )
+                  ),
+                { concurrency: 'unbounded' }
+              ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
+          }
+        ),
         certIssuer:
           requirements.certIssuer && site.protocol === 'https:'
             ? optional(certificate.issuer(site)).pipe(
