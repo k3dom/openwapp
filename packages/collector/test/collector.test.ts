@@ -764,10 +764,9 @@ describe('Collector.collectPromise', () => {
   })
 
   it('rejects with the reason of an aborted signal', async () => {
-    const server = await serve(() => {})
     const controller = new AbortController()
     const reason = new Error('Took too long')
-    setTimeout(() => controller.abort(reason), 50)
+    const server = await serve(() => controller.abort(reason))
     try {
       await expect(
         Collector.collectPromise(server.url, requirementsOf({}), {

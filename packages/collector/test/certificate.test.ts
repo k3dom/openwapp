@@ -49,7 +49,7 @@ describe('Certificate.layerNode', () => {
       const certificate = yield* Certificate.Certificate
       const issuer = yield* certificate.issuer(url)
       expect(issuer).toBe('C=US\nO=Example CA\nCN=Example Issuer')
-    }).pipe(Effect.scoped, Effect.provide(Certificate.layerNode))
+    }).pipe(Effect.provide(Certificate.layerNode))
   )
 
   it.effect('fails with a CertificateError when nothing listens', () =>
@@ -91,6 +91,6 @@ describe('Certificate.layerNode', () => {
       yield* Deferred.await(accepted)
       yield* Fiber.interrupt(fiber)
       yield* Deferred.await(closed)
-    }).pipe(Effect.scoped, Effect.provide(Certificate.layerNode))
+    }).pipe(Effect.provide(Certificate.layerNode))
   )
 })
