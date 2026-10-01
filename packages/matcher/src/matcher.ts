@@ -39,7 +39,7 @@ const resolveVersion = (
 export const match = (
   catalog: Catalog.Catalog,
   observation: Observation.Observation
-): ReadonlyArray<Detection> => {
+) => {
   const execute = (
     { regex, confidence, version }: Pattern.Pattern,
     values: ReadonlyArray<string> = []

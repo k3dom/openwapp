@@ -28,41 +28,40 @@ export class Page extends Context.Service<
   }
 >()('@openwapp/collector/page/Page') {}
 
-export const layerHttp: Layer.Layer<Page, never, HttpClient.HttpClient> =
-  Layer.effect(
-    Page,
-    Effect.gen(function* () {
-      const client = (yield* HttpClient.HttpClient).pipe(
-        HttpClient.followRedirects()
-      )
-      return Page.of({
-        load: Effect.fn('Page.load')(
-          function* (url) {
-            const response = yield* client.get(url)
-            return {
-              url: [response.url],
-              header: new Map(
-                Object.entries(response.headers).map(
-                  ([name, value]) => [name, Array.of(value)] as const
-                )
-              ),
-              cookie: new Map(
-                pipe(
-                  Record.values(response.cookies.cookies),
-                  Array.groupBy(({ name }) => name.toLowerCase()),
-                  Record.map(Array.map(({ value }) => value)),
-                  Record.toEntries
-                )
-              ),
-              html: [yield* response.text],
-            }
-          },
-          (effect, url) =>
-            Effect.mapError(
-              effect,
-              (cause) => new PageError({ url: url.href, cause })
-            )
-        ),
-      })
+export const layerHttp = Layer.effect(
+  Page,
+  Effect.gen(function* () {
+    const client = (yield* HttpClient.HttpClient).pipe(
+      HttpClient.followRedirects()
+    )
+    return Page.of({
+      load: Effect.fn('Page.load')(
+        function* (url) {
+          const response = yield* client.get(url)
+          return {
+            url: [response.url],
+            header: new Map(
+              Object.entries(response.headers).map(
+                ([name, value]) => [name, Array.of(value)] as const
+              )
+            ),
+            cookie: new Map(
+              pipe(
+                Record.values(response.cookies.cookies),
+                Array.groupBy(({ name }) => name.toLowerCase()),
+                Record.map(Array.map(({ value }) => value)),
+                Record.toEntries
+              )
+            ),
+            html: [yield* response.text],
+          }
+        },
+        (effect, url) =>
+          Effect.mapError(
+            effect,
+            (cause) => new PageError({ url: url.href, cause })
+          )
+      ),
     })
-  )
+  })
+)

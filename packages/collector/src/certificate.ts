@@ -21,7 +21,7 @@ export class Certificate extends Context.Service<
   }
 >()('@openwapp/collector/certificate/Certificate') {}
 
-export const layerNode: Layer.Layer<Certificate> = Layer.succeed(
+export const layerNode = Layer.succeed(
   Certificate,
   Certificate.of({
     issuer: Effect.fn('Certificate.issuer')(

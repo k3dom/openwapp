@@ -77,7 +77,7 @@ const lookups: {
     (await resolver.resolveTxt(hostname)).map((chunks) => chunks.join('')),
 }
 
-export const layerNode: Layer.Layer<Resolver> = Layer.succeed(
+export const layerNode = Layer.succeed(
   Resolver,
   Resolver.of({
     resolve: Effect.fn('Resolver.resolve')(function* (hostname, type) {

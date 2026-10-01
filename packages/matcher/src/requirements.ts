@@ -32,7 +32,7 @@ export class Requirements extends Schema.Class<Requirements>(
   domProperty: NamesBySelector,
 }) {}
 
-export const fromCatalog = (catalog: Catalog.Catalog): Requirements => {
+export const fromCatalog = (catalog: Catalog.Catalog) => {
   const rules = [...catalog.technologies.values()].flatMap(({ rules }) => rules)
   const of = <const Tag extends Rule.Rule['_tag']>(tag: Tag) =>
     rules.filter(Rule.Rule.isAnyOf([tag]))

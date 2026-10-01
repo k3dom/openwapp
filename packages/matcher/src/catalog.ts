@@ -73,11 +73,10 @@ export class CatalogError extends Schema.TaggedError<CatalogError>(
   }
 }
 
-export const decode = (input: unknown): Effect.Effect<Catalog, CatalogError> =>
+export const decode = (input: unknown) =>
   Schema.decodeUnknownEffect(FromJson)(input, {
     errors: 'all',
     onExcessProperty: 'error',
   }).pipe(Effect.mapError((cause) => new CatalogError({ cause })))
 
-export const decodeSync = (input: unknown): Catalog =>
-  Effect.runSync(decode(input))
+export const decodeSync = (input: unknown) => Effect.runSync(decode(input))

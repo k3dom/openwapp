@@ -79,7 +79,7 @@ const TechnologyName = Pattern.TaggedString.pipe(
 const Selectors = Schema.Array(Pattern.TaggedString).pipe(
   Schema.decodeTo(Rules, {
     decode: SchemaGetter.transform((selectors) =>
-      selectors.map(({ value, confidence, version }): Rule.Rule => ({
+      selectors.map(({ value, confidence, version }) => ({
         _tag: 'DomExists',
         selector: value,
         confidence,
@@ -114,10 +114,7 @@ const Dom = Schema.Union([
     Schema.decodeTo(Rules, {
       decode: SchemaGetter.transform((elements) =>
         Object.entries(elements).flatMap(
-          ([
-            selector,
-            { exists, text, attributes = {}, properties = {} },
-          ]): ReadonlyArray<Rule.Rule> => [
+          ([selector, { exists, text, attributes = {}, properties = {} }]) => [
             ...Array.fromNullishOr(exists).map(({ confidence, version }) => ({
               _tag: 'DomExists' as const,
               selector,
@@ -161,7 +158,7 @@ const sources = {
   certIssuer: Pattern.FromString.pipe(
     Schema.decodeTo(Rules, {
       decode: SchemaGetter.transform((pattern) => [
-        { _tag: 'CertIssuer' as const, pattern },
+        { _tag: 'CertIssuer', pattern },
       ]),
       encode: SchemaGetter.forbiddenEncoding,
     })
@@ -199,7 +196,7 @@ const sources = {
       decode: SchemaGetter.transform((records) =>
         Rule.DnsRecordType.literals.flatMap((type) =>
           (records[type] ?? []).map((pattern) => ({
-            _tag: 'Dns' as const,
+            _tag: 'Dns',
             type,
             pattern,
           }))

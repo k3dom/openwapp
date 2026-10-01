@@ -19,29 +19,14 @@ export interface PromiseOptions {
   readonly signal?: AbortSignal
 }
 
-export const layer: Layer.Layer<
-  | Page.Page
-  | Certificate.Certificate
-  | HttpClient.HttpClient
-  | Resolver.Resolver
-> = Layer.mergeAll(
+export const layer = Layer.mergeAll(
   Page.layerHttp,
   Certificate.layerNode,
   Resolver.layerNode
 ).pipe(Layer.provideMerge(FetchHttpClient.layer))
 
 export const collect = Effect.fn('Collector.collect')(
-  function* (
-    url: string | URL,
-    requirements: Requirements.Requirements
-  ): Effect.fn.Return<
-    Observation.Observation,
-    Page.PageError,
-    | Page.Page
-    | Certificate.Certificate
-    | HttpClient.HttpClient
-    | Resolver.Resolver
-  > {
+  function* (url: string | URL, requirements: Requirements.Requirements) {
     const target = yield* Effect.try({
       try: () => new URL(url),
       catch: (cause) => new Page.PageError({ url: String(url), cause }),
@@ -121,7 +106,7 @@ export const collectPromise = (
   url: string | URL,
   requirements: Requirements.Requirements,
   options?: PromiseOptions
-): Promise<Observation.Observation> =>
+) =>
   Effect.runPromise(
     collect(url, requirements).pipe(Effect.provide(layer)),
     options
@@ -132,14 +117,7 @@ export const collectPromise = (
 export const detect = Effect.fn('Collector.detect')(function* (
   catalog: Catalog.Catalog,
   url: string | URL
-): Effect.fn.Return<
-  ReadonlyArray<Matcher.Detection>,
-  Page.PageError,
-  | Page.Page
-  | Certificate.Certificate
-  | HttpClient.HttpClient
-  | Resolver.Resolver
-> {
+) {
   const observation = yield* collect(url, Requirements.fromCatalog(catalog))
   return Matcher.match(catalog, observation)
 })
@@ -148,7 +126,7 @@ export const detectPromise = (
   catalog: Catalog.Catalog,
   url: string | URL,
   options?: PromiseOptions
-): Promise<ReadonlyArray<Matcher.Detection>> =>
+) =>
   collectPromise(url, Requirements.fromCatalog(catalog), options).then(
     (observation) => Matcher.match(catalog, observation)
   )
