@@ -12,7 +12,7 @@ fails with a `PageError` when the page cannot be loaded. Other requests, such as
 robots.txt, are skipped when they fail.
 
 **Without Effect**, `Collector.detectPromise` rejects with the `PageError`. Pass
-a `signal` to stop it.
+a `signal` to stop it early, which rejects with the signal's reason.
 
 ```ts
 import { Collector, Page } from '@openwapp/collector'
@@ -52,6 +52,8 @@ await Effect.runPromise(program)
 `Collector.collect` returns the `Observation` without matching it. It gathers
 what the `Requirements` list.
 
+**Without Effect**:
+
 ```ts
 import { Collector } from '@openwapp/collector'
 import { Requirements } from '@openwapp/matcher'
@@ -62,7 +64,13 @@ const observation = await Collector.collectPromise(
 )
 ```
 
+**With Effect**:
+
 ```ts
+import { Collector } from '@openwapp/collector'
+import { Requirements } from '@openwapp/matcher'
+import { Effect } from 'effect'
+
 const observation = await Effect.runPromise(
   Collector.collect(
     'https://example.com',

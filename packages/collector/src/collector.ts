@@ -4,12 +4,8 @@ import {
   Observation,
   Requirements,
 } from '@openwapp/matcher'
-import { Array, Effect, Layer, Option } from 'effect'
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpClientResponse,
-} from 'effect/unstable/http'
+import { Array, Effect, Layer } from 'effect'
+import { FetchHttpClient, HttpClient } from 'effect/unstable/http'
 
 import * as Page from '#/page.ts'
 
@@ -20,54 +16,54 @@ export interface PromiseOptions {
 export const layer: Layer.Layer<Page.Page | HttpClient.HttpClient> =
   Page.layerHttp.pipe(Layer.provideMerge(FetchHttpClient.layer))
 
-export const collect = (
-  url: string | URL,
-  requirements: Requirements.Requirements
-): Effect.Effect<
-  Observation.Observation,
-  Page.PageError,
-  Page.Page | HttpClient.HttpClient
-> =>
-  Effect.gen(function* () {
+export const collect = Effect.fn('Collector.collect')(
+  function* (
+    url: string | URL,
+    requirements: Requirements.Requirements
+  ): Effect.fn.Return<
+    Observation.Observation,
+    Page.PageError,
+    Page.Page | HttpClient.HttpClient
+  > {
     const target = yield* Effect.try({
       try: () => new URL(url),
       catch: (cause) => new Page.PageError({ url: String(url), cause }),
     })
     const page = yield* Page.Page
     const client = (yield* HttpClient.HttpClient).pipe(
-      HttpClient.followRedirects()
+      HttpClient.followRedirects(),
+      HttpClient.filterStatusOk
     )
     const fetchText = (path: string) =>
-      client.get(new URL(path, target)).pipe(
-        Effect.flatMap(HttpClientResponse.filterStatusOk),
+      client.get(new URL(path.replace(/^\/*/, '/'), target)).pipe(
         Effect.flatMap((response) => response.text),
-        Effect.tapError((error) => Effect.logDebug(error)),
-        Effect.option
+        Effect.tapError(Effect.logDebug)
       )
 
-    const { snapshot, robots, probe } = yield* Effect.all(
+    const { snapshot, ...fields } = yield* Effect.all(
       {
         snapshot: page.load(target, requirements),
         robots: requirements.robots
-          ? fetchText('/robots.txt')
-          : Effect.succeedNone,
-        probe: Effect.forEach(
+          ? fetchText('/robots.txt').pipe(
+              Effect.map(Array.of),
+              Effect.orElseSucceed(() => [])
+            )
+          : Effect.succeed([]),
+        probe: Effect.partition(
           requirements.probe,
           (path) =>
             fetchText(path).pipe(
-              Effect.map(Option.map((body) => [path, Array.of(body)] as const))
+              Effect.map((body) => [path, Array.of(body)] as const)
             ),
           { concurrency: 'unbounded' }
-        ),
+        ).pipe(Effect.map(([, found]) => new Map(found))),
       },
       { concurrency: 'unbounded' }
     )
-    return new Observation.Observation({
-      ...snapshot,
-      robots: Option.toArray(robots),
-      probe: new Map(Array.getSomes(probe)),
-    })
-  }).pipe(Effect.provideService(HttpClient.TracerPropagationEnabled, false))
+    return new Observation.Observation({ ...snapshot, ...fields })
+  },
+  Effect.provideService(HttpClient.TracerPropagationEnabled, false)
+)
 
 export const collectPromise = (
   url: string | URL,
@@ -77,23 +73,27 @@ export const collectPromise = (
   Effect.runPromise(
     collect(url, requirements).pipe(Effect.provide(layer)),
     options
+  ).catch((error: unknown) =>
+    Promise.reject(options?.signal?.aborted ? options.signal.reason : error)
   )
 
-export const detect = (
+export const detect = Effect.fn('Collector.detect')(function* (
   catalog: Catalog.Catalog,
   url: string | URL
-): Effect.Effect<
+): Effect.fn.Return<
   ReadonlyArray<Matcher.Detection>,
   Page.PageError,
   Page.Page | HttpClient.HttpClient
-> =>
-  collect(url, Requirements.fromCatalog(catalog)).pipe(
-    Effect.map((observation) => Matcher.match(catalog, observation))
-  )
+> {
+  const observation = yield* collect(url, Requirements.fromCatalog(catalog))
+  return Matcher.match(catalog, observation)
+})
 
 export const detectPromise = (
   catalog: Catalog.Catalog,
   url: string | URL,
   options?: PromiseOptions
 ): Promise<ReadonlyArray<Matcher.Detection>> =>
-  Effect.runPromise(detect(catalog, url).pipe(Effect.provide(layer)), options)
+  collectPromise(url, Requirements.fromCatalog(catalog), options).then(
+    (observation) => Matcher.match(catalog, observation)
+  )

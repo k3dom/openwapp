@@ -89,10 +89,6 @@ describe('Collector.collect', () => {
       expect(observation.html).toEqual(['<html></html>'])
       expect(observation.header.get('server')).toEqual(['nginx'])
       expect(observation.header.get('x-powered-by')).toEqual(['PHP'])
-      expect(observation.header.get('set-cookie')).toEqual([
-        'PHPSESSID=abc; Path=/',
-        'Lang=en',
-      ])
       expect(observation.cookie).toEqual(
         new Map([
           ['phpsessid', ['abc']],
@@ -101,6 +97,23 @@ describe('Collector.collect', () => {
       )
     }).pipe(Effect.provide(layer))
   })
+
+  it.effect(
+    'observes cookies with attributes that cannot be serialized',
+    () => {
+      const { layer } = site({
+        'https://example.com/': () =>
+          new Response('', { headers: { 'set-cookie': 'Id=1; Path=/café' } }),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({})
+        )
+        expect(observation.cookie).toEqual(new Map([['id', ['1']]]))
+      }).pipe(Effect.provide(layer))
+    }
+  )
 
   it.effect('follows redirects to the final url', () => {
     const { layer } = site({
@@ -192,6 +205,29 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect('probes paths at the root of the site', () => {
+    const { layer, requested } = site({
+      'https://example.com/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      yield* Collector.collect(
+        'https://example.com/shop/',
+        requirementsOf({
+          Example: { probe: { version: '', '//other.example/x': '' } },
+        })
+      )
+      expect(requested).toEqual(
+        expect.arrayContaining([
+          'https://example.com/version',
+          'https://example.com/other.example/x',
+        ])
+      )
+      expect(
+        requested.filter((url) => !url.startsWith('https://example.com/'))
+      ).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
   it.effect('ignores failures of requests besides the page', () => {
     const { layer } = site({
       'https://example.com/': () => new Response('page'),
@@ -221,9 +257,9 @@ describe('Collector.collect', () => {
         requirementsOf({ Example: { robots: ['Disallow'] } })
       )
       expect(headers).toHaveLength(2)
-      for (const request of headers) {
-        expect(Object.keys(request)).not.toContain('traceparent')
-        expect(Object.keys(request)).not.toContain('b3')
+      for (const sent of headers) {
+        expect(Object.keys(sent)).not.toContain('traceparent')
+        expect(Object.keys(sent)).not.toContain('b3')
       }
     }).pipe(Effect.provide(layer))
   })
@@ -306,7 +342,7 @@ describe('Collector.detect', () => {
 })
 
 describe('Collector.detectPromise', () => {
-  it('detects technologies on a live site with the upstream fingerprints', async () => {
+  it('detects technologies on a local server with the upstream fingerprints', async () => {
     const resolve = createRequire(import.meta.url).resolve
     const read = (path: string): Record<string, unknown> =>
       JSON.parse(
@@ -349,14 +385,17 @@ describe('Collector.collectPromise', () => {
     ).rejects.toBeInstanceOf(Page.PageError)
   })
 
-  it('stops when the signal aborts', async () => {
+  it('rejects with the reason of an aborted signal', async () => {
     const server = await serve(() => {})
+    const controller = new AbortController()
+    const reason = new Error('Took too long')
+    setTimeout(() => controller.abort(reason), 50)
     try {
       await expect(
         Collector.collectPromise(server.url, requirementsOf({}), {
-          signal: AbortSignal.timeout(50),
+          signal: controller.signal,
         })
-      ).rejects.toThrow()
+      ).rejects.toBe(reason)
     } finally {
       await server.close()
     }
