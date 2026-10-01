@@ -81,6 +81,18 @@ const observation = new Observation.Observation({
 })
 ```
 
+### Requirements
+
+`Requirements.fromCatalog` lists what must be gathered to fill an observation
+for a catalog.
+
+```ts
+import { Requirements } from '@openwapp/matcher'
+
+const requirements = Requirements.fromCatalog(catalog)
+console.log(requirements.robots, [...requirements.js])
+```
+
 ### Matcher
 
 `Matcher.match` returns a `Detection` for every technology found in the
