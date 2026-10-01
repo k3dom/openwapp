@@ -6,16 +6,17 @@ const Values = Schema.Array(Schema.String).pipe(
   Schema.withConstructorDefault(Effect.succeed([]))
 )
 
+const PresentValues = Schema.NonEmptyArray(Schema.String)
+
 const ValuesBy = <Key extends Schema.Constraint>(key: Key) =>
-  Schema.ReadonlyMap(key, Schema.Array(Schema.String)).pipe(
+  Schema.ReadonlyMap(key, PresentValues).pipe(
     Schema.withConstructorDefault(Effect.succeed(new Map()))
   )
 
-const ValuesBySelectorAnd = <Key extends Schema.Constraint>(key: Key) =>
-  Schema.ReadonlyMap(
-    Schema.String,
-    Schema.ReadonlyMap(key, Schema.Array(Schema.String))
-  ).pipe(Schema.withConstructorDefault(Effect.succeed(new Map())))
+const ValuesBySelectorAndName = Schema.ReadonlyMap(
+  Schema.String,
+  Schema.ReadonlyMap(Schema.String, PresentValues)
+).pipe(Schema.withConstructorDefault(Effect.succeed(new Map())))
 
 export class Observation extends Schema.Class<Observation>(
   '@openwapp/matcher/observation/Observation'
@@ -39,6 +40,6 @@ export class Observation extends Schema.Class<Observation>(
     Schema.withConstructorDefault(Effect.succeed(new Set()))
   ),
   domText: ValuesBy(Schema.String),
-  domAttribute: ValuesBySelectorAnd(Schema.String),
-  domProperty: ValuesBySelectorAnd(Schema.String),
+  domAttribute: ValuesBySelectorAndName,
+  domProperty: ValuesBySelectorAndName,
 }) {}

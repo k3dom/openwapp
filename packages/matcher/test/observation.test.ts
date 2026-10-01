@@ -4,7 +4,7 @@ import { SchemaIssue } from 'effect'
 import * as Observation from '#/observation.ts'
 import * as Rule from '#/rule.ts'
 
-const issue = (make: () => unknown) => {
+const issueMessage = (make: () => unknown) => {
   try {
     make()
   } catch (error) {
@@ -67,19 +67,32 @@ describe('Observation', () => {
     ])
   })
 
-  it.each([
+  it.each<[string, ConstructorParameters<typeof Observation.Observation>[0]]>([
     ['a header', { header: new Map([['Server', ['nginx']]]) }],
     ['a cookie', { cookie: new Map([['Session', ['1']]]) }],
     ['a meta', { meta: new Map([['Generator', ['WordPress']]]) }],
   ])('rejects %s name with uppercase letters', (_, fields) => {
-    expect(issue(() => new Observation.Observation(fields))).toMatch(
+    expect(issueMessage(() => new Observation.Observation(fields))).toMatch(
       /in lowercase/
     )
   })
 
+  it.each([
+    ['a keyed field', { js: new Map([['jQuery', []]]) }],
+    [
+      'a field keyed by selector and name',
+      { domProperty: new Map([['a', new Map([['_example', []]])]]) },
+    ],
+  ])('rejects a key without values in %s', (_, fields) => {
+    expect(
+      // @ts-expect-error a present key needs at least one value
+      issueMessage(() => new Observation.Observation(fields))
+    ).toMatch(/Missing key\n  at .*\[1\]\[0\]$/)
+  })
+
   it('rejects an unknown dns record type', () => {
     expect(
-      issue(
+      issueMessage(
         () =>
           new Observation.Observation({
             // @ts-expect-error HTTPS is not a known record type
