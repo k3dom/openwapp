@@ -1,0 +1,364 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { createServer, type RequestListener } from 'node:http'
+import { createRequire } from 'node:module'
+import type { AddressInfo } from 'node:net'
+import { dirname, join } from 'node:path'
+
+import { describe, expect, it } from '@effect/vitest'
+import { Catalog, Observation, Requirements } from '@openwapp/matcher'
+import { Effect, Layer } from 'effect'
+import {
+  HttpClient,
+  HttpClientError,
+  HttpClientResponse,
+} from 'effect/unstable/http'
+
+import * as Collector from '#/collector.ts'
+import * as Page from '#/page.ts'
+
+const catalogOf = (technologies: Record<string, object>) =>
+  Catalog.decodeSync({
+    technologies: Object.fromEntries(
+      Object.entries(technologies).map(([name, technology]) => [
+        name,
+        { cats: [1], website: 'https://example.com', ...technology },
+      ])
+    ),
+    categories: { 1: { name: 'CMS', priority: 1, groups: [1] } },
+    groups: { 1: { name: 'Content' } },
+  })
+
+const requirementsOf = (technologies: Record<string, object>) =>
+  Requirements.fromCatalog(catalogOf(technologies))
+
+const site = (routes: Record<string, () => Response | Error>) => {
+  const requested: Array<string> = []
+  const headers: Array<Record<string, string>> = []
+  const client = HttpClient.make((request, url) => {
+    requested.push(url.href)
+    headers.push(request.headers)
+    const response = routes[url.href]?.() ?? new Response(null, { status: 404 })
+    return response instanceof Error
+      ? Effect.fail(
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause: response,
+            }),
+          })
+        )
+      : Effect.succeed(HttpClientResponse.fromWeb(request, response))
+  })
+  const clientLayer = Layer.succeed(HttpClient.HttpClient, client)
+  return {
+    requested,
+    headers,
+    clientLayer,
+    layer: Page.layerHttp.pipe(Layer.provideMerge(clientLayer)),
+  }
+}
+
+const serve = async (listener: RequestListener) => {
+  const server = createServer(listener)
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  return {
+    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/`,
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections()
+        server.close(() => resolve())
+      }),
+  }
+}
+
+describe('Collector.collect', () => {
+  it.effect('observes the url, headers, cookies and html of the page', () => {
+    const headers = new Headers({ server: 'nginx', 'x-powered-by': 'PHP' })
+    headers.append('set-cookie', 'PHPSESSID=abc; Path=/')
+    headers.append('set-cookie', 'Lang=en')
+    const { layer } = site({
+      'https://example.com/': () => new Response('<html></html>', { headers }),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      )
+      expect(observation).toBeInstanceOf(Observation.Observation)
+      expect(observation.url).toEqual(['https://example.com/'])
+      expect(observation.html).toEqual(['<html></html>'])
+      expect(observation.header.get('server')).toEqual(['nginx'])
+      expect(observation.header.get('x-powered-by')).toEqual(['PHP'])
+      expect(observation.header.get('set-cookie')).toEqual([
+        'PHPSESSID=abc; Path=/',
+        'Lang=en',
+      ])
+      expect(observation.cookie).toEqual(
+        new Map([
+          ['phpsessid', ['abc']],
+          ['lang', ['en']],
+        ])
+      )
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('follows redirects to the final url', () => {
+    const { layer } = site({
+      'http://example.com/': () =>
+        new Response(null, {
+          status: 301,
+          headers: { location: 'https://example.com/home' },
+        }),
+      'https://example.com/home': () => new Response('home'),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'http://example.com/',
+        requirementsOf({})
+      )
+      expect(observation.url).toEqual(['https://example.com/home'])
+      expect(observation.html).toEqual(['home'])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('observes a page whatever its status', () => {
+    const { layer } = site({
+      'https://example.com/': () =>
+        new Response('blocked', { status: 403, headers: { server: 'cdn' } }),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      )
+      expect(observation.header.get('server')).toEqual(['cdn'])
+      expect(observation.html).toEqual(['blocked'])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('fetches robots.txt only when the catalog has robots rules', () => {
+    const { layer, requested } = site({
+      'https://example.com/': () => new Response(''),
+      'https://example.com/robots.txt': () => new Response('Disallow: /x/'),
+    })
+    return Effect.gen(function* () {
+      const without = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { html: ['example'] } })
+      )
+      expect(without.robots).toEqual([])
+      expect(requested).not.toContain('https://example.com/robots.txt')
+
+      const observation = yield* Collector.collect(
+        'https://example.com/shop/',
+        requirementsOf({ Example: { robots: ['Disallow'] } })
+      )
+      expect(observation.robots).toEqual(['Disallow: /x/'])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('leaves robots empty when robots.txt is missing', () => {
+    const { layer } = site({
+      'https://example.com/': () => new Response(''),
+      'https://example.com/robots.txt': () =>
+        new Response('Not found', { status: 404 }),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { robots: ['Not found'] } })
+      )
+      expect(observation.robots).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('probes the required paths and keeps the ones that exist', () => {
+    const { layer, requested } = site({
+      'https://example.com/': () => new Response(''),
+      'https://example.com/version': () => new Response('Example 1.0'),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/shop/',
+        requirementsOf({
+          Example: { probe: { '/version': 'Example' } },
+          Other: { probe: { '/other': '' } },
+        })
+      )
+      expect(observation.probe).toEqual(
+        new Map([['/version', ['Example 1.0']]])
+      )
+      expect(requested).toContain('https://example.com/other')
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('ignores failures of requests besides the page', () => {
+    const { layer } = site({
+      'https://example.com/': () => new Response('page'),
+      'https://example.com/robots.txt': () => new Error('connection reset'),
+      'https://example.com/version': () => new Error('connection reset'),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({
+          Example: { robots: ['Disallow'], probe: { '/version': '' } },
+        })
+      )
+      expect(observation.html).toEqual(['page'])
+      expect(observation.robots).toEqual([])
+      expect(observation.probe).toEqual(new Map())
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('sends no tracing headers to the site', () => {
+    const { layer, headers } = site({
+      'https://example.com/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { robots: ['Disallow'] } })
+      )
+      expect(headers).toHaveLength(2)
+      for (const request of headers) {
+        expect(Object.keys(request)).not.toContain('traceparent')
+        expect(Object.keys(request)).not.toContain('b3')
+      }
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('fails with a PageError when the page cannot be loaded', () => {
+    const { layer } = site({
+      'https://example.com/': () => new Error('getaddrinfo ENOTFOUND'),
+    })
+    return Effect.gen(function* () {
+      const error = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      ).pipe(Effect.flip)
+      expect(error).toBeInstanceOf(Page.PageError)
+      expect(error.url).toBe('https://example.com/')
+      expect(error.message).toBe('Could not load https://example.com/')
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('fails with a PageError for an invalid url', () => {
+    const { layer, requested } = site({})
+    return Effect.gen(function* () {
+      const error = yield* Collector.collect(
+        'example.com',
+        requirementsOf({})
+      ).pipe(Effect.flip)
+      expect(error).toBeInstanceOf(Page.PageError)
+      expect(error.url).toBe('example.com')
+      expect(requested).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('loads the page through the Page service', () => {
+    const { clientLayer } = site({})
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      )
+      expect(observation.url).toEqual(['https://example.com/rendered'])
+      expect(observation.html).toEqual(['<html>rendered</html>'])
+    }).pipe(
+      Effect.provide(
+        Layer.succeed(Page.Page, {
+          load: () =>
+            Effect.succeed({
+              url: ['https://example.com/rendered'],
+              header: new Map(),
+              cookie: new Map(),
+              html: ['<html>rendered</html>'],
+            }),
+        })
+      ),
+      Effect.provide(clientLayer)
+    )
+  })
+})
+
+describe('Collector.detect', () => {
+  it.effect('matches what it collected against the catalog', () => {
+    const { layer } = site({
+      'https://example.com/': () =>
+        new Response('', { headers: { 'x-powered-by': 'Example/2.1' } }),
+    })
+    return Effect.gen(function* () {
+      const detections = yield* Collector.detect(
+        catalogOf({
+          Example: {
+            headers: { 'X-Powered-By': 'Example/([\\d.]+)\\;version:\\1' },
+          },
+          Other: { headers: { Server: 'Other' } },
+        }),
+        'https://example.com/'
+      )
+      expect(
+        detections.map(({ technology, version }) => [technology.name, version])
+      ).toEqual([['Example', '2.1']])
+    }).pipe(Effect.provide(layer))
+  })
+})
+
+describe('Collector.detectPromise', () => {
+  it('detects technologies on a live site with the upstream fingerprints', async () => {
+    const resolve = createRequire(import.meta.url).resolve
+    const read = (path: string): Record<string, unknown> =>
+      JSON.parse(
+        readFileSync(resolve(`@openwapp/fingerprints/${path}`), 'utf8')
+      )
+    const catalog = Catalog.decodeSync({
+      technologies: Object.assign(
+        {},
+        ...readdirSync(
+          dirname(resolve('@openwapp/fingerprints/technologies/a.json'))
+        ).map((file) => read(join('technologies', file)))
+      ),
+      categories: read('categories.json'),
+      groups: read('groups.json'),
+    })
+    const server = await serve((_, response) => {
+      response.setHeader('server', 'nginx/1.25.3')
+      response.setHeader('x-powered-by', 'PHP/8.3.0')
+      response.end('<html></html>')
+    })
+    try {
+      const detections = await Collector.detectPromise(catalog, server.url)
+      expect(
+        detections.map(
+          ({ technology, version }) => `${technology.name} ${version}`
+        )
+      ).toEqual(expect.arrayContaining(['Nginx 1.25.3', 'PHP 8.3.0']))
+    } finally {
+      await server.close()
+    }
+  })
+})
+
+describe('Collector.collectPromise', () => {
+  it('rejects with a PageError when nothing listens', async () => {
+    const server = await serve((_, response) => response.end())
+    await server.close()
+    await expect(
+      Collector.collectPromise(server.url, requirementsOf({}))
+    ).rejects.toBeInstanceOf(Page.PageError)
+  })
+
+  it('stops when the signal aborts', async () => {
+    const server = await serve(() => {})
+    try {
+      await expect(
+        Collector.collectPromise(server.url, requirementsOf({}), {
+          signal: AbortSignal.timeout(50),
+        })
+      ).rejects.toThrow()
+    } finally {
+      await server.close()
+    }
+  })
+})

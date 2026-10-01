@@ -134,6 +134,9 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.116
         version: 4.0.0-rc.116(effect@4.0.0-rc.116)(vitest@5.0.1)
+      '@openwapp/fingerprints':
+        specifier: workspace:*
+        version: link:../fingerprints
       '@openwapp/oxfmt':
         specifier: workspace:*
         version: link:../../tooling/oxfmt
