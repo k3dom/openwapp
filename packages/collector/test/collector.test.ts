@@ -707,6 +707,35 @@ describe('Collector.detect', () => {
   })
 })
 
+describe('Collector.layer', () => {
+  it.live('sends every request like a browser', () =>
+    Effect.gen(function* () {
+      const received: Array<Record<string, unknown>> = []
+      const server = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          serve((request, response) => {
+            received.push(request.headers)
+            response.end()
+          })
+        ),
+        (server) => Effect.promise(server.close)
+      )
+      yield* Collector.collect(
+        server.url,
+        requirementsOf({ Example: { robots: ['Disallow'] } })
+      )
+      expect(received).toHaveLength(2)
+      for (const headers of received) {
+        expect(headers).toMatchObject({
+          'user-agent': expect.stringMatching(/ Chrome\/\d+\.0\.0\.0 /),
+          accept: expect.stringMatching(/^text\/html,/),
+          'accept-language': 'en-US,en;q=0.9',
+        })
+      }
+    }).pipe(Effect.provide(Collector.layer))
+  )
+})
+
 describe('Collector.detectPromise', () => {
   it('detects technologies on a local server with the upstream fingerprints', async () => {
     const resolve = createRequire(import.meta.url).resolve
