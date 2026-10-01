@@ -6,13 +6,12 @@ Visits a site, gathers what the matcher needs and reports what was detected.
 
 ### Detect
 
-`Collector.detect` loads a page, collects what the catalog's rules test and
-matches it. Build the catalog with `Catalog.decode` from `@openwapp/matcher`. It
-fails with a `PageError` when the page cannot be loaded. Other requests, such as
-robots.txt, are skipped when they fail.
+`Collector.detect` visits a site and returns what the catalog detects on it.
+Build the catalog with `Catalog.decode` from `@openwapp/matcher`. It fails with
+a `PageError` when the site cannot be loaded.
 
 **Without Effect**, `Collector.detectPromise` rejects with the `PageError`. Pass
-a `signal` to stop it early, which rejects with the signal's reason.
+a `signal` to stop it early.
 
 ```ts
 import { Collector, Page } from '@openwapp/collector'
@@ -32,7 +31,7 @@ try {
 }
 ```
 
-**With Effect**, provide `Collector.layer`, which loads pages with `fetch`.
+**With Effect**, provide `Collector.layer`:
 
 ```ts
 import { Collector } from '@openwapp/collector'
@@ -49,8 +48,7 @@ await Effect.runPromise(program)
 
 ### Collect
 
-`Collector.collect` returns the `Observation` without matching it. It gathers
-what the `Requirements` list.
+`Collector.collect` returns the `Observation` without matching it.
 
 **Without Effect**:
 
@@ -58,43 +56,20 @@ what the `Requirements` list.
 import { Collector } from '@openwapp/collector'
 import { Requirements } from '@openwapp/matcher'
 
+const requirements = Requirements.fromCatalog(catalog)
 const observation = await Collector.collectPromise(
   'https://example.com',
-  Requirements.fromCatalog(catalog)
+  requirements
 )
 ```
 
 **With Effect**:
 
 ```ts
-import { Collector } from '@openwapp/collector'
-import { Requirements } from '@openwapp/matcher'
-import { Effect } from 'effect'
-
 const observation = await Effect.runPromise(
-  Collector.collect(
-    'https://example.com',
-    Requirements.fromCatalog(catalog)
-  ).pipe(Effect.provide(Collector.layer))
-)
-```
-
-### Page
-
-The `Page` service loads the page itself. `Page.layerHttp` fetches it with the
-`HttpClient` in context and fills `url`, `header`, `cookie` and `html`. Provide
-another `HttpClient` to change how requests are sent, or another `Page` to load
-pages differently.
-
-```ts
-import { Collector, Page } from '@openwapp/collector'
-import { Effect, Layer } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
-
-const layer = Page.layerHttp.pipe(Layer.provideMerge(FetchHttpClient.layer))
-
-const program = Collector.detect(catalog, 'https://example.com').pipe(
-  Effect.provide(layer)
+  Collector.collect('https://example.com', requirements).pipe(
+    Effect.provide(Collector.layer)
+  )
 )
 ```
 
