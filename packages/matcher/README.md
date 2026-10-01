@@ -5,15 +5,13 @@ observed on a site.
 
 ## Usage
 
-`Catalog.decodeSync` and `Catalog.decode` take the raw technologies, categories
-and groups in the
-[webappanalyzer format](https://github.com/enthec/webappanalyzer#specification)
-and produce a validated `Catalog`. When the input does not match the format,
-they fail with a `CatalogError` that lists every invalid fingerprint. Once the
-input matches, they check that every reference points to a known technology,
-category or group and list all that do not.
+### Catalog
 
-Load the fingerprints from `@openwapp/fingerprints` or bring your own.
+`Catalog.decode` turns fingerprints in the
+[webappanalyzer format](https://github.com/enthec/webappanalyzer#specification)
+into a `Catalog`. It fails with a `CatalogError` listing every invalid
+fingerprint and unknown reference. Load the fingerprints from
+`@openwapp/fingerprints` or bring your own.
 
 ```ts
 import { readdir, readFile } from 'node:fs/promises'
@@ -37,10 +35,7 @@ const input = {
 }
 ```
 
-Then decode them into a catalog.
-
-**Without Effect**, `Catalog.decodeSync` returns the catalog and throws the
-`CatalogError`.
+**Without Effect**, `Catalog.decodeSync` throws the `CatalogError`.
 
 ```ts
 import { Catalog } from '@openwapp/matcher'
@@ -54,8 +49,7 @@ try {
 }
 ```
 
-**With Effect**, `Catalog.decode` returns an `Effect` that fails with the
-`CatalogError`.
+**With Effect**:
 
 ```ts
 import { Catalog } from '@openwapp/matcher'
@@ -72,9 +66,7 @@ await Effect.runPromise(program)
 ### Observation
 
 An `Observation` holds what was observed on a site, with one field per rule tag.
-Every field defaults to empty, so fill only what you gathered. Header, cookie
-and meta names must be lowercase. The constructor throws when a field is
-invalid.
+Fields default to empty. Header, cookie and meta names must be lowercase.
 
 ```ts
 import { Observation } from '@openwapp/matcher'
