@@ -37,14 +37,14 @@ export const FromJson = Schema.Struct({
             issue: `Unknown technology "${excluded}"`,
           })),
           ...technology.requires
-            .filter((prerequisite) => prerequisite._tag === 'Technology')
+            .filter(Technology.Prerequisite.guards.Technology)
             .map((prerequisite, index) => ({
               path: ['technologies', name, 'requires', index],
               found: technologies.has(prerequisite.name),
               issue: `Unknown technology "${prerequisite.name}"`,
             })),
           ...technology.requires
-            .filter((prerequisite) => prerequisite._tag === 'Category')
+            .filter(Technology.Prerequisite.guards.Category)
             .map((prerequisite, index) => ({
               path: ['technologies', name, 'requiresCategory', index],
               found: categories.has(prerequisite.id),
