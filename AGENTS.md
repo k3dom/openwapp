@@ -59,6 +59,14 @@ the top level and import the module as a whole:
 Name the module after its primary service when it has one
 (`KeyValueStore.KeyValueStore`).
 
+### Effect and plain APIs
+
+**Users should not need to know Effect.** Keep core logic in plain functions.
+Every exported function that returns an `Effect` gets a plain counterpart: a
+`Sync` variant that throws the typed error when it does no I/O, or a `Promise`
+variant that rejects with it when it does. For example, `Catalog.decodeSync`
+sits next to `Catalog.decode`. Usage examples in READMEs always show both.
+
 ### Prose
 
 **Never use semicolons or em dashes to structure sentences.** This applies to
