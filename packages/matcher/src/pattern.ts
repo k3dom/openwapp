@@ -32,7 +32,7 @@ export class Pattern extends Schema.Class<Pattern>(
   version: Version,
 }) {}
 
-export const Tagged = Schema.String.pipe(
+export const TaggedString = Schema.String.pipe(
   Schema.decodeTo(
     Schema.Struct({
       value: Schema.String,
@@ -97,7 +97,7 @@ export const Tagged = Schema.String.pipe(
   )
 )
 
-export const FromString = Tagged.pipe(
+export const FromString = TaggedString.pipe(
   Schema.decodeTo(Pattern, {
     decode: SchemaGetter.transformEffect(
       ({ value, confidence, version }, options) =>

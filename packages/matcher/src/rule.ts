@@ -17,7 +17,7 @@ export const DnsRecordType = Schema.Literals([
 ])
 export type DnsRecordType = typeof DnsRecordType.Type
 
-const Name = Schema.String.check(Schema.isLowercased())
+const LowercaseName = Schema.String.check(Schema.isLowercased())
 
 export const Rule = Schema.TaggedUnion({
   Url: { pattern: Pattern.Pattern },
@@ -29,9 +29,9 @@ export const Rule = Schema.TaggedUnion({
   ScriptSrc: { pattern: Pattern.Pattern },
   Xhr: { pattern: Pattern.Pattern },
   CertIssuer: { pattern: Pattern.Pattern },
-  Header: { name: Name, pattern: Pattern.Pattern },
-  Cookie: { name: Name, pattern: Pattern.Pattern },
-  Meta: { name: Name, pattern: Pattern.Pattern },
+  Header: { name: LowercaseName, pattern: Pattern.Pattern },
+  Cookie: { name: LowercaseName, pattern: Pattern.Pattern },
+  Meta: { name: LowercaseName, pattern: Pattern.Pattern },
   Js: { property: Schema.String, pattern: Pattern.Pattern },
   Dns: { type: DnsRecordType, pattern: Pattern.Pattern },
   Probe: { path: Schema.String, pattern: Pattern.Pattern },

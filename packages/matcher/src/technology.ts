@@ -69,7 +69,14 @@ const keyedPatterns = (
     })
   )
 
-const Selectors = Schema.Array(Pattern.Tagged).pipe(
+const TechnologyName = Pattern.TaggedString.pipe(
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transform(({ value }) => value),
+    encode: SchemaGetter.forbiddenEncoding,
+  })
+)
+
+const Selectors = Schema.Array(Pattern.TaggedString).pipe(
   Schema.decodeTo(Rules, {
     decode: SchemaGetter.transform((selectors) =>
       selectors.map(({ value, confidence, version }): Rule.Rule => ({
@@ -95,7 +102,7 @@ const Dom = Schema.Union([
     Schema.String,
     Schema.Struct({
       exists: Schema.optionalKey(
-        Pattern.Tagged.check(
+        Pattern.TaggedString.check(
           Schema.makeFilter(
             ({ value }) => value === '' || `Expected only tags, got "${value}"`
           )
@@ -161,7 +168,7 @@ const Fingerprint = Schema.Struct({
   cats: Schema.NonEmptyArray(Schema.Int),
   implies: Schema.optionalKey(
     Schema.Array(
-      Pattern.Tagged.pipe(
+      Pattern.TaggedString.pipe(
         Schema.decodeTo(Implication, {
           decode: SchemaGetter.transform(({ value, confidence, version }) => ({
             name: value,
@@ -173,8 +180,8 @@ const Fingerprint = Schema.Struct({
       )
     )
   ),
-  excludes: Schema.optionalKey(Schema.Array(Schema.String)),
-  requires: Schema.optionalKey(Schema.Array(Schema.String)),
+  excludes: Schema.optionalKey(Schema.Array(TechnologyName)),
+  requires: Schema.optionalKey(Schema.Array(TechnologyName)),
   requiresCategory: Schema.optionalKey(Schema.Array(Schema.Int)),
   url: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Url', pattern }))),
   html: Schema.optionalKey(patterns((pattern) => ({ _tag: 'Html', pattern }))),

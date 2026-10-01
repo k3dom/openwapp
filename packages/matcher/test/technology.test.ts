@@ -129,8 +129,8 @@ describe('Technology.FromJson', () => {
   it('reads implies, excludes and requires', () => {
     const technology = decode({
       implies: ['PHP\\;confidence:50', 'Magento\\;version:2'],
-      excludes: ['Other'],
-      requires: ['WordPress'],
+      excludes: ['Other\\;confidence:50'],
+      requires: ['WordPress\\;version:6'],
       requiresCategory: [6],
     })
     expect(technology?.implies[0]).toBeInstanceOf(Technology.Implication)
