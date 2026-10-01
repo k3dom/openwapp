@@ -1,0 +1,51 @@
+{
+  "name": "@openwapp/fingerprints",
+  "version": "0.0.0",
+  "description": "The enthec/webappanalyzer technology fingerprints, kept in sync with upstream.",
+  "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/fingerprints#readme",
+  "bugs": {
+    "url": "https://github.com/k3dom/openwapp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k3dom/openwapp.git",
+    "directory": "packages/fingerprints"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "check": "pnpm run lint && pnpm run format:check"
+  },
+  "devDependencies": {
+    "@openwapp/oxfmt": "workspace:*",
+    "@openwapp/oxlint": "workspace:*",
+    "@openwapp/tsconfig": "workspace:*",
+    "@openwapp/vitest": "workspace:*",
+    "@types/node": "26.6.1",
+    "@vitest/coverage-v8": "5.0.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}

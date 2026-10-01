@@ -1,0 +1,59 @@
+{
+  "name": "@openwapp/collector",
+  "version": "0.0.0",
+  "description": "Visits a website and reports which technologies it is built with.",
+  "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/collector#readme",
+  "bugs": {
+    "url": "https://github.com/k3dom/openwapp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k3dom/openwapp.git",
+    "directory": "packages/collector"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "check": "pnpm run lint && pnpm run format:check"
+  },
+  "dependencies": {
+    "@openwapp/matcher": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.116",
+    "@openwapp/oxfmt": "workspace:*",
+    "@openwapp/oxlint": "workspace:*",
+    "@openwapp/tsconfig": "workspace:*",
+    "@openwapp/vitest": "workspace:*",
+    "@types/node": "26.6.1",
+    "@vitest/coverage-v8": "5.0.1",
+    "effect": "4.0.0-rc.116",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  },
+  "peerDependencies": {
+    "effect": "^4.0.0-rc.116"
+  }
+}

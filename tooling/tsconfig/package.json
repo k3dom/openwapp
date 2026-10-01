@@ -1,0 +1,15 @@
+{
+  "name": "@openwapp/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "check": "pnpm run format:check"
+  },
+  "devDependencies": {
+    "@openwapp/oxfmt": "workspace:*",
+    "oxfmt": "0.68.0"
+  }
+}

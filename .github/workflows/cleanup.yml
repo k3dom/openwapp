@@ -1,0 +1,25 @@
+name: Cleanup
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions: {}
+
+jobs:
+  cleanup-pr-caches:
+    name: Cleanup PR caches
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cleanup caches for closed branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: refs/heads/${{ github.head_ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Deleting caches for branch: $BRANCH"
+          gh cache list --ref "$BRANCH" --repo "$REPO" --limit 100 --json id --jq '.[].id' |
+            xargs -I {} gh cache delete {} --repo "$REPO" || true

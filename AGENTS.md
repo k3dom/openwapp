@@ -1,0 +1,57 @@
+# openwapp
+
+Open source matching engine and collector for Wappalyzer fingerprints, built on
+the community maintained
+[enthec/webappanalyzer](https://github.com/enthec/webappanalyzer) data.
+
+## Tooling
+
+- Use pnpm for JS/TS packages.
+- Use Turborepo to run tasks across the monorepo.
+- Common scripts: `format`, `lint` (includes type checking), `build`, `test`.
+- Releases use Changesets. A change to a published package comes with a
+  changeset from `pnpm changeset`. Merging to `master` opens a "Version
+  Packages" PR, and merging that PR publishes to npm.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `k3dom/openwapp`, managed via the `gh` CLI. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name. See
+`docs/agents/triage-labels.md`.
+
+## Rules
+
+Do not read git stashes unless explicitly instructed.
+
+## Code style
+
+### Comments
+
+**Default to zero comments.** Write one only when the information is essential
+and cannot be inferred from the code itself. If unsure, it is not needed.
+
+### Functions
+
+**Default to inlining logic.** Reading straight down and having logic be
+co-located beats jumping between definitions. Keep logic inline when a function
+would only name a few lines used once or twice.
+
+### Modules
+
+**The file is the namespace.** Export services, layers, helpers, and types at
+the top level and import the module as a whole:
+`import * as Catalog from '#/catalog.ts'`, then `Catalog.load`, `Catalog.layer`,
+`Catalog.Catalog`. Do not hang layers or helpers off a service class as statics.
+Name the module after its primary service when it has one
+(`KeyValueStore.KeyValueStore`).
+
+### Prose
+
+**Never use semicolons or em dashes to structure sentences.** This applies to
+all prose, whether in documentation, comments or strings.

@@ -1,0 +1,33 @@
+name: Check
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  TURBO_NO_UPDATE_NOTIFIER: true
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup JS
+        uses: $/.github/actions/setup-js
+
+      - name: Build, lint, test and check formatting
+        run: pnpm exec turbo run build lint test format:check

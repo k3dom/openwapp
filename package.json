@@ -1,0 +1,24 @@
+{
+  "name": "openwapp",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "tooling/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt AGENTS.md README.md oxfmt.config.ts package.json pnpm-workspace.yaml tsconfig.json turbo.json .changeset .github docs scripts",
+    "format:check": "oxfmt --check AGENTS.md README.md oxfmt.config.ts package.json pnpm-workspace.yaml tsconfig.json turbo.json .changeset .github docs scripts",
+    "check": "pnpm --recursive run check",
+    "release": "turbo run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@openwapp/oxfmt": "workspace:*",
+    "oxfmt": "0.68.0",
+    "turbo": "2.10.13",
+    "typescript": "7.0.2"
+  },
+  "packageManager": "pnpm@12.3.4"
+}
