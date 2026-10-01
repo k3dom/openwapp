@@ -6,6 +6,7 @@
   "bugs": {
     "url": "https://github.com/k3dom/openwapp/issues"
   },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/k3dom/openwapp.git",

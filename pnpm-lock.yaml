@@ -214,10 +214,6 @@ importers:
         version: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.1(@types/node@26.6.1))
 
   packages/matcher:
-    dependencies:
-      '@openwapp/fingerprints':
-        specifier: workspace:*
-        version: link:../fingerprints
     devDependencies:
       '@effect/vitest':
         specifier: 4.0.0-rc.116

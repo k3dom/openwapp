@@ -13,6 +13,14 @@ the community maintained
   changeset from `pnpm changeset`. Merging to `master` opens a "Version
   Packages" PR, and merging that PR publishes to npm.
 
+## Licensing
+
+`packages/fingerprints` is GPL-3.0-only because it carries the upstream data.
+Everything else is MIT. MIT packages must never copy, bundle or depend on
+fingerprint data, so `@openwapp/fingerprints` may only appear in their
+`devDependencies`. The matcher takes a catalog as input and leaves loading the
+data to the user.
+
 ## Agent skills
 
 ### Issue tracker
