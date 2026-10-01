@@ -1,7 +1,7 @@
 import Dns from 'node:dns/promises'
 
 import { Rule } from '@openwapp/matcher'
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Context, Effect, Layer, Predicate, Schema } from 'effect'
 
 export class ResolverError extends Schema.TaggedError<ResolverError>(
   '@openwapp/collector/resolver/ResolverError'
@@ -80,25 +80,23 @@ const lookups: {
 export const layerNode = Layer.succeed(
   Resolver,
   Resolver.of({
-    resolve: Effect.fn('Resolver.resolve')(function* (hostname, type) {
-      return yield* Effect.tryPromise({
+    resolve: Effect.fn('Resolver.resolve')((hostname, type) =>
+      Effect.tryPromise({
         try: (signal) => {
           const resolver = new Dns.Resolver()
           resolver.setServers(Dns.getServers())
           signal.addEventListener('abort', () => resolver.cancel())
-          return lookups[type](resolver, hostname).catch((error: unknown) => {
-            if (
-              error instanceof Error &&
-              'code' in error &&
-              (error.code === Dns.NODATA || error.code === Dns.NOTFOUND)
-            ) {
-              return []
-            }
-            throw error
-          })
+          return lookups[type](resolver, hostname)
         },
         catch: (cause) => new ResolverError({ hostname, type, cause }),
-      })
-    }),
+      }).pipe(
+        Effect.catchIf(
+          ({ cause }) =>
+            Predicate.hasProperty(cause, 'code') &&
+            (cause.code === Dns.NODATA || cause.code === Dns.NOTFOUND),
+          () => Effect.succeed([])
+        )
+      )
+    ),
   })
 )
