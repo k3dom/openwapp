@@ -11,7 +11,9 @@ is that engine, built with Effect.
 
 It consists of three parts:
 
-- **fingerprints**: the enthec data, kept in sync with upstream
+- **fingerprints**: the enthec data, kept in sync with upstream. Its format is
+  defined by the
+  [webappanalyzer specification](https://github.com/enthec/webappanalyzer#specification).
 - **matcher**: turns the fingerprints into a typed catalog and matches it
   against what was observed on a site. The
   [HTTP Archive fork of Wappalyzer](https://github.com/HTTPArchive/wappalyzer/blob/main/src/js/wappalyzer.js#L104)
