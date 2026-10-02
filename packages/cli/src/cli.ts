@@ -5,7 +5,7 @@ import { Argument, CliError, Command, Flag } from 'effect/cli'
 
 import * as Fingerprints from '#/fingerprints.ts'
 
-const seconds = (name: string, fallback: number, description: string) =>
+const secondsFlag = (name: string, fallback: number, description: string) =>
   Flag.Finite(name).pipe(
     Flag.withDescription(description),
     Flag.filter(
@@ -22,67 +22,68 @@ const url = Argument.String('url').pipe(
   )
 )
 
-const root = Command.make('openwapp').pipe(
-  Command.withSharedFlags({
-    fingerprints: Flag.Path('fingerprints', { mustExist: true }).pipe(
-      Flag.withAlias('f'),
-      Flag.withDescription(
-        'Fingerprints in the webappanalyzer format, as a directory or a JSON file. Defaults to $OPENWAPP_FINGERPRINTS'
-      ),
-      Flag.withFallbackConfig(Config.String('OPENWAPP_FINGERPRINTS'))
+const scanFlags = {
+  fingerprints: Flag.Path('fingerprints', { mustExist: true }).pipe(
+    Flag.withAlias('f'),
+    Flag.withDescription(
+      'Fingerprints in the webappanalyzer format, as a directory or a JSON file. Defaults to $OPENWAPP_FINGERPRINTS'
     ),
-    headers: Flag.String('header').pipe(
-      Flag.withAlias('H'),
-      Flag.withMetavar('"name: value"'),
-      Flag.withDescription(
-        'Header to send with every request. Repeat it to send several'
-      ),
-      Flag.filterMap(
-        (header) => {
-          const colon = header.indexOf(':')
-          return colon > 0
-            ? Option.some([
-                header.slice(0, colon).trim(),
-                header.slice(colon + 1).trim(),
-              ] as const)
-            : Option.none()
-        },
-        (header) => `Expected a header as "name: value", got "${header}"`
-      ),
-      Flag.atLeast(0)
+    Flag.withFallbackConfig(Config.String('OPENWAPP_FINGERPRINTS'))
+  ),
+  headers: Flag.String('header').pipe(
+    Flag.withAlias('H'),
+    Flag.withMetavar('"name: value"'),
+    Flag.withDescription(
+      'Header to send with every request. Repeat it to send several'
     ),
-    dnsServers: Flag.String('dns-server').pipe(
-      Flag.withDescription(
-        'DNS server to query. Repeat it to query several. Defaults to the system servers'
-      ),
-      Flag.atLeast(0)
+    Flag.filterMap(
+      (header) => {
+        const colon = header.indexOf(':')
+        return colon > 0
+          ? Option.some([
+              header.slice(0, colon).trim(),
+              header.slice(colon + 1).trim(),
+            ] as const)
+          : Option.none()
+      },
+      (header) => `Expected a header as "name: value", got "${header}"`
     ),
-    timeout: seconds(
-      'timeout',
-      30,
-      'Seconds that loading a page may take. Defaults to 30'
+    Flag.atLeast(0)
+  ),
+  dnsServers: Flag.String('dns-server').pipe(
+    Flag.withDescription(
+      'DNS server to query. Repeat it to query several. Defaults to the system servers'
     ),
-    lookupTimeout: seconds(
-      'lookup-timeout',
-      10,
-      'Seconds that each other lookup may take before it is skipped. Defaults to 10'
-    ),
-  }),
-  Command.withDescription('Reports which technologies websites are built with')
-)
+    Flag.atLeast(0)
+  ),
+  timeout: secondsFlag(
+    'timeout',
+    30,
+    'Seconds that scanning a site may take. Defaults to 30'
+  ),
+  lookupTimeout: secondsFlag(
+    'lookup-timeout',
+    10,
+    'Seconds that each lookup besides the page may take before it is skipped. Defaults to 10'
+  ),
+}
 
-const prepare = Effect.gen(function* () {
-  const { fingerprints, headers, dnsServers, timeout, lookupTimeout } =
-    yield* root
+const makeScanner = Effect.fn('makeScanner')(function* ({
+  fingerprints,
+  headers,
+  dnsServers,
+  timeout,
+  lookupTimeout,
+}: Command.Command.Config.Infer<typeof scanFlags>) {
   const catalog = yield* Fingerprints.load(fingerprints)
   const requirements = Requirements.fromCatalog(catalog)
-  const layer = Collector.layerOptions({
-    headers: Object.fromEntries(headers),
-    ...(dnsServers.length > 0 && { resolver: { servers: dnsServers } }),
-  })
   return {
     catalog,
-    collect: (url: string) =>
+    layer: Collector.layerOptions({
+      headers: Object.fromEntries(headers),
+      ...(dnsServers.length > 0 && { resolver: { servers: dnsServers } }),
+    }),
+    scan: (url: string) =>
       Collector.collect(url, requirements, {
         lookupTimeout: Duration.seconds(lookupTimeout),
       }).pipe(
@@ -102,8 +103,7 @@ const prepare = Effect.gen(function* () {
           return reason === error
             ? error.message
             : `${error.message}: ${reason.message}`
-        }),
-        Effect.provide(layer)
+        })
       ),
   }
 })
@@ -111,6 +111,7 @@ const prepare = Effect.gen(function* () {
 const detect = Command.make(
   'detect',
   {
+    ...scanFlags,
     urls: url.pipe(Argument.variadic({ min: 1 })),
     json: Flag.Boolean('json').pipe(
       Flag.withDescription('Print one JSON object per site instead of text'),
@@ -126,13 +127,13 @@ const detect = Command.make(
       Flag.withDefault(5)
     ),
   },
-  Effect.fn('detect')(function* ({ urls, json, concurrency }) {
-    const { catalog, collect } = yield* prepare
+  Effect.fn('detect')(function* ({ urls, json, concurrency, ...flags }) {
+    const { catalog, layer, scan } = yield* makeScanner(flags)
     const failures = Array.getFailures(
       yield* Effect.forEach(
         urls,
         (url) =>
-          collect(url).pipe(
+          scan(url).pipe(
             Effect.map((observation) => ({
               url,
               finalUrl: observation.url.at(-1) ?? url,
@@ -180,7 +181,7 @@ const detect = Command.make(
             Effect.result
           ),
         { concurrency }
-      )
+      ).pipe(Effect.provide(layer))
     )
     if (failures.length > 0) {
       return yield* new CliError.UserError({
@@ -205,13 +206,14 @@ const detect = Command.make(
 
 const collect = Command.make(
   'collect',
-  { url },
-  Effect.fn('collect')(function* ({ url }) {
-    const { collect } = yield* prepare
-    const observation = yield* collect(url).pipe(
+  { ...scanFlags, url },
+  Effect.fn('collect')(function* ({ url, ...flags }) {
+    const { layer, scan } = yield* makeScanner(flags)
+    const observation = yield* scan(url).pipe(
       Effect.mapError(
         (error) => new CliError.UserError({ cause: error, userMessage: error })
-      )
+      ),
+      Effect.provide(layer)
     )
     yield* Console.log(
       JSON.stringify(
@@ -232,4 +234,7 @@ const collect = Command.make(
   )
 )
 
-export const command = root.pipe(Command.withSubcommands([detect, collect]))
+export const command = Command.make('openwapp').pipe(
+  Command.withDescription('Reports which technologies websites are built with'),
+  Command.withSubcommands([detect, collect])
+)

@@ -47,6 +47,19 @@ const acme = (_: unknown, response: Parameters<RequestListener>[1]) =>
     .setHeader('x-powered-by', 'AcmeCMS/2.1')
     .end('<html><script src="/beta.js"></script></html>')
 
+describe('openwapp', () => {
+  it.live('shows the help without any fingerprints', () =>
+    Effect.gen(function* () {
+      const error = yield* run().pipe(Effect.flip)
+      expect(error).toMatchObject({ _tag: 'ShowHelp', errors: [] })
+      expect(yield* TestConsole.logLines).toEqual([
+        expect.stringContaining('detect     Detect the technologies'),
+      ])
+      expect(yield* TestConsole.errorLines).toEqual([])
+    }).pipe(Effect.provide(TestLayer))
+  )
+})
+
 describe('detect', () => {
   it.live('prints the technologies of a site with their categories', () =>
     Effect.gen(function* () {
@@ -209,7 +222,7 @@ describe('detect', () => {
     }).pipe(Effect.provide(TestLayer))
   )
 
-  it.live('gives up on a page that takes longer than --timeout', () =>
+  it.live('gives up on a scan that takes longer than --timeout', () =>
     Effect.gen(function* () {
       const url = yield* serve(() => {})
       const error = yield* run(

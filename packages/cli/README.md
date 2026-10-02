@@ -103,15 +103,15 @@ openwapp collect example.com > observation.json
 | `--fingerprints`, `-f`         | `$OPENWAPP_FINGERPRINTS`              |
 | `--header`, `-H`               | Chrome on Windows, merged with yours  |
 | `--dns-server`                 | the DNS servers of the system         |
-| `--timeout`                    | 30 seconds to load the page           |
+| `--timeout`                    | 30 seconds to scan a site             |
 | `--lookup-timeout`             | 10 seconds for each lookup besides it |
 | `--json` (detect)              | prints text                           |
 | `--concurrency`, `-c` (detect) | 5 sites at once                       |
 
 `--header` takes `"name: value"` and `--dns-server` takes an address such as
-`1.1.1.1`. Repeat them to pass several. A lookup besides the page, such as
-`/robots.txt`, a DNS record or the certificate, is skipped when it takes longer
-than `--lookup-timeout`.
+`1.1.1.1`. Repeat them to pass several. `--timeout` covers the whole scan of a
+site, while a lookup besides the page, such as `/robots.txt`, a DNS record or
+the certificate, is skipped when it takes longer than `--lookup-timeout`.
 
 ```sh
 openwapp detect example.com \
