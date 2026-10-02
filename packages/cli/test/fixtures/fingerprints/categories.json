@@ -1,0 +1,17 @@
+{
+  "1": {
+    "name": "CMS",
+    "priority": 1,
+    "groups": [1]
+  },
+  "2": {
+    "name": "Programming languages",
+    "priority": 2,
+    "groups": [1]
+  },
+  "3": {
+    "name": "Analytics",
+    "priority": 3,
+    "groups": [1]
+  }
+}

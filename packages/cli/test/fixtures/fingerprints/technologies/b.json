@@ -1,0 +1,7 @@
+{
+  "Beta Analytics": {
+    "cats": [3],
+    "website": "https://beta.example",
+    "scriptSrc": ["beta\\.js\\;confidence:50"]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "Acme CMS": {
+    "cats": [1],
+    "website": "https://acme.example",
+    "description": "A content management system.",
+    "headers": {
+      "x-powered-by": "^AcmeCMS(?:/([\\d.]+))?\\;version:\\1"
+    },
+    "implies": ["Acme Language"]
+  },
+  "Acme Language": {
+    "cats": [2],
+    "website": "https://acme.example/language"
+  }
+}

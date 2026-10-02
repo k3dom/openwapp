@@ -9,6 +9,7 @@ the community maintained
 | [`@openwapp/fingerprints`](packages/fingerprints) | The enthec fingerprints, kept in sync with upstream | GPL-3.0-only |
 | [`@openwapp/matcher`](packages/matcher)           | Matches the fingerprints against observed site data | MIT          |
 | [`@openwapp/collector`](packages/collector)       | Visits a site and reports what was detected         | MIT          |
+| [`@openwapp/cli`](packages/cli)                   | Reports what a site is built with from the terminal | MIT          |
 
 ## Prerequisites
 

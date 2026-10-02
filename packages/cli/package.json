@@ -1,0 +1,60 @@
+{
+  "name": "@openwapp/cli",
+  "version": "0.0.0",
+  "description": "Command line interface that reports which technologies a website is built with.",
+  "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/k3dom/openwapp/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k3dom/openwapp.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "openwapp": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "check": "pnpm run lint && pnpm run format:check"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0",
+    "@openwapp/collector": "workspace:*",
+    "@openwapp/matcher": "workspace:*",
+    "effect": "4.0.0"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0",
+    "@openwapp/fingerprints": "workspace:*",
+    "@openwapp/oxfmt": "workspace:*",
+    "@openwapp/oxlint": "workspace:*",
+    "@openwapp/tsconfig": "workspace:*",
+    "@openwapp/vitest": "workspace:*",
+    "@types/node": "26.6.1",
+    "@vitest/coverage-v8": "5.0.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "publint": "0.3.25",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}
