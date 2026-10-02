@@ -188,6 +188,9 @@ importers:
 
   packages/collector:
     dependencies:
+      '@exodus/bytes':
+        specifier: 1.16.0
+        version: 1.16.0
       '@openwapp/matcher':
         specifier: workspace:*
         version: link:../matcher
@@ -197,6 +200,9 @@ importers:
       domutils:
         specifier: 4.0.2
         version: 4.0.2
+      encoding-sniffer:
+        specifier: 1.0.2
+        version: 1.0.2
       htmlparser2:
         specifier: 12.0.0
         version: 12.0.0
@@ -484,6 +490,15 @@ packages:
     peerDependencies:
       effect: ^4.0.0
       vitest: '>=5.0.0 <6.0.0'
+
+  '@exodus/bytes@1.16.0':
+    resolution: {integrity: sha512-IcpW84uEn3N7ETtNZMlxKhfl6Pec8rUNGOTBtWbK1FKhJxIFAptZyVrvVRVBimAJxJCgc3PxepxkdWWG4DVzfA==}
+    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
+    peerDependencies:
+      '@noble/hashes': ^1.8.0 || ^2.0.0
+    peerDependenciesMeta:
+      '@noble/hashes':
+        optional: true
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -1333,6 +1348,10 @@ packages:
     resolution: {integrity: sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==}
     engines: {node: '>=14'}
 
+  encoding-sniffer@1.0.2:
+    resolution: {integrity: sha512-dlQ0jlnDJ2ElE1Ky4crYX0pPEPxQY9F2j+ZMIXlBedLJToEfDed9pvPqXg4fZnuu4qVBbcIrZVeg3S4aibTYGw==}
+    engines: {node: '>=20.19.0'}
+
   entities@8.1.0:
     resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
     engines: {node: '>=20.19.0'}
@@ -2008,6 +2027,8 @@ snapshots:
       effect: 4.0.0
       vitest: 5.0.1(@types/node@26.6.1)(@vitest/coverage-v8@5.0.1)(vite@8.3.1(@types/node@26.6.1))
 
+  '@exodus/bytes@1.16.0': {}
+
   '@jridgewell/resolve-uri@3.1.2': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
@@ -2496,6 +2517,12 @@ snapshots:
   effect@4.0.0: {}
 
   empathic@2.1.0: {}
+
+  encoding-sniffer@1.0.2:
+    dependencies:
+      '@exodus/bytes': 1.16.0
+    transitivePeerDependencies:
+      - '@noble/hashes'
 
   entities@8.1.0: {}
 

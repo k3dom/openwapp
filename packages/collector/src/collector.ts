@@ -17,6 +17,7 @@ import {
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import { NetAddress } from 'effect/net'
 
+import * as Body from '#/body.ts'
 import * as Certificate from '#/certificate.ts'
 import * as Markup from '#/markup.ts'
 import * as Page from '#/page.ts'
@@ -131,6 +132,9 @@ export const layer = layerOptions()
  * records and reads its certificate. Lookups that fail or time out are left
  * out of the observation.
  *
+ * Reads at most the first 2 MiB of the page and of each probe and the first
+ * 500 KiB of `/robots.txt`. Only that part of a larger body is observed.
+ *
  * Fails with a `PageError` when the page cannot be loaded. Provide `layer` or
  * `layerOptions` to run it. Use `collectPromise` to run it without Effect.
  */
@@ -161,15 +165,19 @@ export const collect = Effect.fn('Collector.collect')(
         Effect.tapError(Effect.logDebug),
         Effect.option
       )
-    const fetchText = (path: string) =>
+    const fetchText = (path: string, limit?: number) =>
       optional(
-        client.get(path).pipe(Effect.flatMap((response) => response.text))
+        client
+          .get(path)
+          .pipe(Effect.flatMap((response) => Body.text(response, limit)))
       )
 
     const fields = yield* Effect.all(
       {
         robots: requirements.robots
-          ? fetchText('/robots.txt').pipe(Effect.map(Option.toArray))
+          ? fetchText('/robots.txt', 500 * 1024).pipe(
+              Effect.map(Option.toArray)
+            )
           : Effect.succeed([]),
         probe: Effect.forEach(
           requirements.probe,

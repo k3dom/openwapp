@@ -116,6 +116,23 @@ const serve = async (listener: RequestListener) => {
   }
 }
 
+const endless = (text: string) => {
+  const chunk = new TextEncoder().encode(text.repeat(64 * 1024))
+  const stream = { cancelled: false }
+  return {
+    stream,
+    response: () =>
+      new Response(
+        new ReadableStream({
+          pull: (controller) => controller.enqueue(chunk),
+          cancel: () => {
+            stream.cancelled = true
+          },
+        })
+      ),
+  }
+}
+
 describe('Collector.collect', () => {
   it.effect('observes the url, headers, cookies and html of the page', () => {
     const headers = new Headers({ server: 'nginx', 'x-powered-by': 'PHP' })
@@ -156,6 +173,135 @@ describe('Collector.collect', () => {
           requirementsOf({})
         )
         expect(observation.cookie).toEqual(new Map([['id', ['1']]]))
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect.each<[string, string | undefined, Uint8Array, string]>([
+    [
+      'the charset of the content-type header',
+      'text/html; charset=ISO-8859-1',
+      Buffer.from('<p>Café</p>', 'latin1'),
+      '<p>Café</p>',
+    ],
+    [
+      'a quoted charset of the content-type header',
+      'text/html;charset="Shift_JIS"',
+      Buffer.from([0x93, 0xfa, 0x96, 0x7b]),
+      '日本',
+    ],
+    [
+      'a meta charset',
+      'text/html',
+      Buffer.concat([
+        Buffer.from('<meta charset="shift_jis"><p>'),
+        Buffer.from([0x93, 0xfa, 0x96, 0x7b]),
+      ]),
+      '<meta charset="shift_jis"><p>日本',
+    ],
+    [
+      'a meta http-equiv content-type',
+      undefined,
+      Buffer.concat([
+        Buffer.from(
+          '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=windows-1252">'
+        ),
+        Buffer.from([0x80]),
+      ]),
+      '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=windows-1252">€',
+    ],
+    [
+      'the last charset of repeated content-type headers',
+      'text/html; charset=utf-8, text/html; charset=iso-8859-1, text/html',
+      Buffer.from('Café', 'latin1'),
+      'Café',
+    ],
+    [
+      'a single quoted charset of the content-type header',
+      "text/html; charset='iso-8859-1'",
+      Buffer.from('Café', 'latin1'),
+      'Café',
+    ],
+    [
+      'the replacement encoding',
+      'text/html; charset=iso-2022-kr',
+      Buffer.from('<p>page</p>'),
+      '\uFFFD',
+    ],
+    [
+      'utf-8 when the meta charset comes after the first 1024 bytes',
+      'text/html',
+      Buffer.from(
+        `<body><!--${'-'.repeat(1024)}--><meta charset="iso-8859-1">Café`,
+        'latin1'
+      ),
+      `<body><!--${'-'.repeat(1024)}--><meta charset="iso-8859-1">Caf\uFFFD`,
+    ],
+    [
+      'the content-type header over a meta charset',
+      'text/html; charset=utf-8',
+      Buffer.from('<meta charset="iso-8859-1">Café'),
+      '<meta charset="iso-8859-1">Café',
+    ],
+    [
+      'a meta charset when the content-type header has an unknown charset',
+      'text/html; charset=unknown',
+      Buffer.from('<meta charset="iso-8859-1">Café', 'latin1'),
+      '<meta charset="iso-8859-1">Café',
+    ],
+    [
+      'the byte order mark over the content-type header',
+      'text/html; charset=iso-8859-1',
+      Buffer.from('\uFEFFCafé'),
+      'Café',
+    ],
+    ['utf-8 without a declaration', 'text/html', Buffer.from('Café'), 'Café'],
+  ])('decodes the page in %s', ([, contentType, body, html]) => {
+    const { layer } = site({
+      'https://example.com/': () =>
+        new Response(
+          body,
+          contentType === undefined
+            ? {}
+            : { headers: { 'content-type': contentType } }
+        ),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      )
+      expect(observation.html).toEqual([html])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect(
+    'extracts what the catalog asks for from a page in a legacy encoding',
+    () => {
+      const { layer } = site({
+        'https://example.com/': () =>
+          new Response(
+            Buffer.from(
+              '<meta charset="windows-1252"><meta name="generator" content="Café 1.0"><p>Café</p>',
+              'latin1'
+            ),
+            { headers: { 'content-type': 'text/html' } }
+          ),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({
+            Example: {
+              text: ['Café'],
+              meta: { generator: 'Café' },
+              dom: { p: { text: 'Café' } },
+            },
+          })
+        )
+        expect(observation.text).toEqual(['Café'])
+        expect(observation.meta).toEqual(new Map([['generator', ['Café 1.0']]]))
+        expect(observation.domText).toEqual(new Map([['p', ['Café']]]))
       }).pipe(Effect.provide(layer))
     }
   )
@@ -446,6 +592,66 @@ describe('Collector.collect', () => {
       expect(observation.robots).toEqual([])
       expect(observation.probe).toEqual(new Map())
       expect(observation.certIssuer).toEqual([])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect(
+    'reads the first 2 MiB of the page and of probes and 500 KiB of robots.txt',
+    () => {
+      const page = endless('a')
+      const robots = endless('r')
+      const probe = endless('p')
+      const { layer } = site({
+        'https://example.com/': page.response,
+        'https://example.com/robots.txt': robots.response,
+        'https://example.com/version': probe.response,
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({
+            Example: { robots: ['r'], probe: { '/version': 'p' } },
+          })
+        )
+        expect(observation.html).toEqual(['a'.repeat(2 * 1024 * 1024)])
+        expect(observation.robots).toEqual(['r'.repeat(500 * 1024)])
+        expect(observation.probe).toEqual(
+          new Map([['/version', ['p'.repeat(2 * 1024 * 1024)]]])
+        )
+        expect(
+          [page, robots, probe].map(({ stream }) => stream.cancelled)
+        ).toEqual([true, true, true])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect('cuts the page at the limit in the middle of a character', () => {
+    const { layer } = site({
+      'https://example.com/': endless('aé').response,
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({})
+      )
+      expect(observation.html).toEqual([
+        `${'aé'.repeat(Math.floor((2 * 1024 * 1024) / 3))}a\uFFFD`,
+      ])
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('keeps a probe that answers without a body', () => {
+    const { layer } = site({
+      'https://example.com/': () => new Response(null),
+      'https://example.com/version': () => new Response(null, { status: 204 }),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { probe: { '/version': '' } } })
+      )
+      expect(observation.html).toEqual([''])
+      expect(observation.probe).toEqual(new Map([['/version', ['']]]))
     }).pipe(Effect.provide(layer))
   })
 
@@ -851,6 +1057,30 @@ describe('Collector.collectPromise', () => {
           signal: controller.signal,
         })
       ).rejects.toBe(reason)
+    } finally {
+      await server.close()
+    }
+  })
+
+  it('stops downloading a page that never ends', async () => {
+    const chunk = 'a'.repeat(64 * 1024)
+    let disconnect: () => void
+    const disconnected = new Promise<void>((resolve) => (disconnect = resolve))
+    const server = await serve((_, response) => {
+      response.on('close', () => disconnect())
+      const write = () => {
+        while (response.write(chunk));
+        if (!response.destroyed) response.once('drain', write)
+      }
+      write()
+    })
+    try {
+      const observation = await Collector.collectPromise(
+        server.url,
+        requirementsOf({})
+      )
+      expect(observation.html[0]).toHaveLength(2 * 1024 * 1024)
+      await disconnected
     } finally {
       await server.close()
     }

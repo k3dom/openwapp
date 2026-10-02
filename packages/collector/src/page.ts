@@ -1,6 +1,10 @@
+import * as Encoding from '@exodus/bytes/encoding.js'
 import type { Observation, Requirements } from '@openwapp/matcher'
 import { Array, Context, Effect, Layer, pipe, Record, Schema } from 'effect'
 import { HttpClient } from 'effect/http'
+import * as EncodingSniffer from 'encoding-sniffer/sniffer'
+
+import * as Body from '#/body.ts'
 
 /**
  * The parts of an `Observation` that come from loading the page.
@@ -40,7 +44,9 @@ export class Page extends Context.Service<
 >()('@openwapp/collector/page/Page') {}
 
 /**
- * Loads the page with the `HttpClient`, following up to 10 redirects.
+ * Loads the page with the `HttpClient`, following up to 10 redirects. Reads
+ * at most the first 2 MiB of the body and decodes it in the encoding the page
+ * declares, or as UTF-8 when it declares none.
  */
 export const layerHttp = Layer.effect(
   Page,
@@ -52,6 +58,7 @@ export const layerHttp = Layer.effect(
       load: Effect.fn('Page.load')(
         function* (url) {
           const response = yield* client.get(url)
+          const body = yield* Body.bytes(response)
           return {
             url: [response.url],
             header: new Map(
@@ -67,7 +74,19 @@ export const layerHttp = Layer.effect(
                 Record.toEntries
               )
             ),
-            html: [yield* response.text],
+            html: [
+              Encoding.legacyHookDecode(
+                body,
+                EncodingSniffer.getEncoding(body, {
+                  transportLayerEncodingLabel: [
+                    ...(response.headers['content-type'] ?? '').matchAll(
+                      /;\s*charset\s*=\s*["']?([^"';,\s]+)/gi
+                    ),
+                  ].at(-1)?.[1],
+                  defaultEncoding: 'utf-8',
+                })
+              ),
+            ],
           }
         },
         (effect, url) =>

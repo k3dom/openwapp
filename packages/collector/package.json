@@ -37,9 +37,11 @@
     "check": "pnpm run lint && pnpm run format:check"
   },
   "dependencies": {
+    "@exodus/bytes": "1.16.0",
     "@openwapp/matcher": "workspace:*",
     "css-select": "7.0.0",
     "domutils": "4.0.2",
+    "encoding-sniffer": "1.0.2",
     "htmlparser2": "12.0.0"
   },
   "devDependencies": {
