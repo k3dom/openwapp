@@ -102,7 +102,24 @@ export const FromString = TaggedString.pipe(
     decode: SchemaGetter.transformEffect(
       ({ value, confidence, version }, options) =>
         Effect.try({
-          try: () => ({ regex: new RegExp(value, 'i'), confidence, version }),
+          try: () => ({
+            // Unbounded quantifiers are capped at 250 repetitions so a pattern
+            // cannot backtrack across a whole page.
+            regex: new RegExp(
+              value.replace(
+                /\\.|\[(?:\\.|[^\\\]])*\]|[+*]|\{(\d+),\}/gs,
+                (token, minimum?: string) => {
+                  if (token === '+') return '{1,250}'
+                  if (token === '*') return '{0,250}'
+                  if (minimum === undefined) return token
+                  return `{${minimum},${Math.max(Number(minimum), 250)}}`
+                }
+              ),
+              'i'
+            ),
+            confidence,
+            version,
+          }),
           catch: (error) =>
             new SchemaIssue.InvalidValue(
               { message: String(error) },

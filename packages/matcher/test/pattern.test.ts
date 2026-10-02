@@ -20,7 +20,7 @@ describe('Pattern.FromString', () => {
     expect(
       decode('jquery-([0-9.]+)\\.js\\;confidence:50\\;version:\\1')
     ).toEqual({
-      regex: /jquery-([0-9.]+)\.js/i,
+      regex: /jquery-([0-9.]{1,250})\.js/i,
       confidence: 50,
       version: [{ _tag: 'Capture', group: 1 }],
     })
@@ -30,6 +30,26 @@ describe('Pattern.FromString', () => {
     const pattern = decode('\\;confidence:25')
     expect(pattern.regex.test('anything')).toBe(true)
     expect(pattern.confidence).toBe(25)
+  })
+
+  it.each([
+    ['a+b*c', 'a{1,250}b{0,250}c'],
+    ['a+?b*?', 'a{1,250}?b{0,250}?'],
+    ['\\d{2,}', '\\d{2,250}'],
+    ['a{300,}', 'a{300,300}'],
+    ['a{2,5}', 'a{2,5}'],
+    ['\\+\\*', '\\+\\*'],
+    ['\\\\+', '\\\\{1,250}'],
+    ['[+*\\]]+', '[+*\\]]{1,250}'],
+    ['[^"+]', '[^"+]'],
+  ])('caps the quantifiers of %s', (source, bounded) => {
+    expect(decode(source).regex.source).toBe(bounded)
+  })
+
+  it('stops matching past 250 repetitions', () => {
+    const { regex } = decode('^a+$')
+    expect(regex.test('a'.repeat(250))).toBe(true)
+    expect(regex.test('a'.repeat(251))).toBe(false)
   })
 
   it.each([
