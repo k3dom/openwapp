@@ -17,6 +17,7 @@
     "README.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "imports": {
     "#/*": "./src/*"
   },
@@ -36,6 +37,7 @@
     "check": "pnpm run lint && pnpm run format:check"
   },
   "devDependencies": {
+    "@arethetypeswrong/core": "0.18.5",
     "@effect/vitest": "4.0.0",
     "@openwapp/fingerprints": "workspace:*",
     "@openwapp/oxfmt": "workspace:*",
@@ -48,6 +50,7 @@
     "oxfmt": "0.68.0",
     "oxlint": "1.82.0",
     "oxlint-tsgolint": "7.0.2001",
+    "publint": "0.3.25",
     "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "vitest": "5.0.1"

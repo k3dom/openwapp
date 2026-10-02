@@ -5,6 +5,9 @@ export default defineConfig({
     index: './src/index.ts',
   },
   exports: true,
+  fixedExtension: false,
+  publint: { level: 'error' },
+  attw: { profile: 'esm-only', level: 'error' },
   sourcemap: true,
   platform: 'node',
   dts: {
