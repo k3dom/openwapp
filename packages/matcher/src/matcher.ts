@@ -24,22 +24,23 @@ const resolveVersion = (
   version: Pattern.Version,
   groups: ReadonlyArray<string | undefined>
 ) =>
+  // Captures longer than 10 characters are usually hashes or tokens, which
+  // would leave a version made of the surrounding text alone.
   version
-    .map((part) =>
-      Pattern.VersionPart.match(part, {
-        Text: ({ value }) => value,
-        // Captures longer than 10 characters are dropped from the version,
-        // while conditionals only check for presence.
-        Capture: ({ group }) => {
-          const capture = groups[group] ?? ''
-          return capture.length > 10 ? '' : capture
-        },
-        Conditional: ({ group, present, absent }) =>
-          groups[group] ? present : absent,
-      })
-    )
-    .join('')
-    .trim()
+    .filter(Pattern.VersionPart.guards.Capture)
+    .some(({ group }) => (groups[group]?.length ?? 0) > 10)
+    ? ''
+    : version
+        .map((part) =>
+          Pattern.VersionPart.match(part, {
+            Text: ({ value }) => value,
+            Capture: ({ group }) => groups[group] ?? '',
+            Conditional: ({ group, present, absent }) =>
+              groups[group] ? present : absent,
+          })
+        )
+        .join('')
+        .trim()
 
 export const match = (
   catalog: Catalog.Catalog,
@@ -196,7 +197,7 @@ export const match = (
         .filter(({ name }) => name === technology.name)
         .map(({ version }) => version),
     ]
-      // Long captures and numbers from 10000 up are usually hashes, build
+      // Long versions and numbers from 10000 up are usually hashes, build
       // numbers or timestamps rather than versions.
       .filter(
         (version) =>

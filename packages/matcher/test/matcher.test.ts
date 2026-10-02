@@ -211,7 +211,13 @@ describe('Matcher.match', () => {
         '1.2.3-rc.45',
         undefined,
       ],
-      ['text beside a long capture', '^(.+)$', 'v\\1', '1.2.3-rc.45', 'v'],
+      [
+        'text beside a long capture',
+        '^(.+)$',
+        'v\\1',
+        '1.2.3-rc.45',
+        undefined,
+      ],
       [
         'a conditional on a long capture',
         '^(.+)$',
