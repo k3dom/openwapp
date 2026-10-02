@@ -103,8 +103,8 @@ export const FromString = TaggedString.pipe(
       ({ value, confidence, version }, options) =>
         Effect.try({
           try: () => ({
-            // Unbounded quantifiers are capped at 250 repetitions so a pattern
-            // cannot backtrack across a whole page.
+            // Bounded quantifiers keep a pattern from backtracking across a
+            // whole page.
             regex: new RegExp(
               value.replace(
                 /\\.|\[(?:\\.|[^\\\]])*\]|[+*]|\{(\d+),\}/gs,
