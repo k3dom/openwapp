@@ -1,17 +1,15 @@
-import { readdirSync, readFileSync } from 'node:fs'
 import { createServer, type RequestListener } from 'node:http'
-import { createRequire } from 'node:module'
 import type { AddressInfo } from 'node:net'
-import { dirname, join } from 'node:path'
 
 import { describe, expect, it } from '@effect/vitest'
+import fingerprints from '@openwapp/fingerprints'
 import {
   Catalog,
   Observation,
   Requirements,
   type Rule,
 } from '@openwapp/matcher'
-import { Deferred, Effect, Fiber, Layer } from 'effect'
+import { Deferred, Duration, Effect, Fiber, Layer } from 'effect'
 import { HttpClient, HttpClientError, HttpClientResponse } from 'effect/http'
 import { TestClock } from 'effect/testing'
 
@@ -538,60 +536,68 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
-  it.effect('leaves out lookups that take longer than 10 seconds', () =>
-    Effect.gen(function* () {
-      const started = yield* Deferred.make<void>()
-      let pending = 4
-      const hang = Effect.suspend(() => {
-        pending -= 1
-        if (pending === 0) Deferred.doneUnsafe(started, Effect.void)
-        return Effect.never
-      })
-      const fiber = yield* Collector.collect(
-        'https://example.com/',
-        requirementsOf({
-          Example: {
-            robots: ['Disallow'],
-            probe: { '/version': '' },
-            dns: { TXT: ['spf'] },
-            certIssuer: 'Example',
-          },
+  it.effect.each<[string, Duration.Input | undefined, number]>([
+    ['10 seconds by default', undefined, 10_000],
+    ['the lookup timeout', '2 seconds', 2_000],
+  ])(
+    'leaves out lookups that take longer than %s',
+    ([, lookupTimeout, millis]) =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>()
+        let pending = 4
+        const hang = Effect.suspend(() => {
+          pending -= 1
+          if (pending === 0) Deferred.doneUnsafe(started, Effect.void)
+          return Effect.never
         })
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            Page.layerHttp,
-            Layer.succeed(Certificate.Certificate, { issuer: () => hang }),
-            Layer.succeed(Resolver.Resolver, { resolve: () => hang })
-          ).pipe(
-            Layer.provideMerge(
-              Layer.succeed(
-                HttpClient.HttpClient,
-                HttpClient.make((request, url) =>
-                  url.pathname === '/'
-                    ? Effect.succeed(
-                        HttpClientResponse.fromWeb(
-                          request,
-                          new Response('page')
+        const fiber = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({
+            Example: {
+              robots: ['Disallow'],
+              probe: { '/version': '' },
+              dns: { TXT: ['spf'] },
+              certIssuer: 'Example',
+            },
+          }),
+          { lookupTimeout }
+        ).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              Page.layerHttp,
+              Layer.succeed(Certificate.Certificate, { issuer: () => hang }),
+              Layer.succeed(Resolver.Resolver, { resolve: () => hang })
+            ).pipe(
+              Layer.provideMerge(
+                Layer.succeed(
+                  HttpClient.HttpClient,
+                  HttpClient.make((request, url) =>
+                    url.pathname === '/'
+                      ? Effect.succeed(
+                          HttpClientResponse.fromWeb(
+                            request,
+                            new Response('page')
+                          )
                         )
-                      )
-                    : hang
+                      : hang
+                  )
                 )
               )
             )
-          )
-        ),
-        Effect.forkChild
-      )
-      yield* Deferred.await(started)
-      yield* TestClock.adjust('10 seconds')
-      const observation = yield* Fiber.join(fiber)
-      expect(observation.html).toEqual(['page'])
-      expect(observation.robots).toEqual([])
-      expect(observation.probe).toEqual(new Map())
-      expect(observation.dns).toEqual(new Map())
-      expect(observation.certIssuer).toEqual([])
-    })
+          ),
+          Effect.forkChild
+        )
+        yield* Deferred.await(started)
+        yield* TestClock.adjust(millis - 1)
+        expect(fiber.pollUnsafe()).toBeUndefined()
+        yield* TestClock.adjust('1 millis')
+        const observation = yield* Fiber.join(fiber)
+        expect(observation.html).toEqual(['page'])
+        expect(observation.robots).toEqual([])
+        expect(observation.probe).toEqual(new Map())
+        expect(observation.dns).toEqual(new Map())
+        expect(observation.certIssuer).toEqual([])
+      })
   )
 
   it.effect('sends no tracing headers to the site', () => {
@@ -736,23 +742,66 @@ describe('Collector.layer', () => {
   )
 })
 
+describe('Collector.layerOptions', () => {
+  it.live('merges the given headers over the defaults', () =>
+    Effect.gen(function* () {
+      const received: Array<Record<string, unknown>> = []
+      const server = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          serve((request, response) => {
+            received.push(request.headers)
+            response.end()
+          })
+        ),
+        (server) => Effect.promise(server.close)
+      )
+      yield* Collector.collect(server.url, requirementsOf({})).pipe(
+        Effect.provide(
+          Collector.layerOptions({
+            headers: { 'User-Agent': 'openwapp', 'x-scan': '1' },
+          })
+        )
+      )
+      expect(received).toEqual([
+        expect.objectContaining({
+          'user-agent': 'openwapp',
+          'x-scan': '1',
+          'accept-language': 'en-US,en;q=0.9',
+        }),
+      ])
+    })
+  )
+
+  it.effect('sends requests through the given fetch', () => {
+    const requested: Array<string> = []
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'http://127.0.0.1/',
+        requirementsOf({ Example: { robots: ['Disallow'] } })
+      )
+      expect(requested).toEqual([
+        'http://127.0.0.1/',
+        'http://127.0.0.1/robots.txt',
+      ])
+      expect(observation.html).toEqual(['page'])
+      expect(observation.robots).toEqual(['robots'])
+    }).pipe(
+      Effect.provide(
+        Collector.layerOptions({
+          fetch: async (input) => {
+            const { url } = new Request(input)
+            requested.push(url)
+            return new Response(url.endsWith('/robots.txt') ? 'robots' : 'page')
+          },
+        })
+      )
+    )
+  })
+})
+
 describe('Collector.detectPromise', () => {
   it('detects technologies on a local server with the upstream fingerprints', async () => {
-    const resolve = createRequire(import.meta.url).resolve
-    const read = (path: string): Record<string, unknown> =>
-      JSON.parse(
-        readFileSync(resolve(`@openwapp/fingerprints/${path}`), 'utf8')
-      )
-    const catalog = Catalog.decodeSync({
-      technologies: Object.assign(
-        {},
-        ...readdirSync(
-          dirname(resolve('@openwapp/fingerprints/technologies/a.json'))
-        ).map((file) => read(join('technologies', file)))
-      ),
-      categories: read('categories.json'),
-      groups: read('groups.json'),
-    })
+    const catalog = Catalog.decodeSync(fingerprints)
     const server = await serve((_, response) => {
       response.setHeader('server', 'nginx/1.25.3')
       response.setHeader('x-powered-by', 'PHP/8.3.0')
@@ -802,6 +851,27 @@ describe('Collector.collectPromise', () => {
           signal: controller.signal,
         })
       ).rejects.toBe(reason)
+    } finally {
+      await server.close()
+    }
+  })
+
+  it('collects with the given headers', async () => {
+    const received: Array<Record<string, unknown>> = []
+    const server = await serve((request, response) => {
+      received.push(request.headers)
+      response.end('page')
+    })
+    try {
+      const observation = await Collector.collectPromise(
+        server.url,
+        requirementsOf({}),
+        { headers: { 'user-agent': 'openwapp' } }
+      )
+      expect(observation.html).toEqual(['page'])
+      expect(received).toEqual([
+        expect.objectContaining({ 'user-agent': 'openwapp' }),
+      ])
     } finally {
       await server.close()
     }

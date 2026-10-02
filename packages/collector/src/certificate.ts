@@ -3,6 +3,10 @@ import * as Tls from 'node:tls'
 import { Context, Effect, Layer, Result, Schema } from 'effect'
 import { NetAddress } from 'effect/net'
 
+/**
+ * The certificate of a site could not be read, because the TLS handshake failed
+ * or no certificate was presented.
+ */
 export class CertificateError extends Schema.TaggedError<CertificateError>(
   '@openwapp/collector/certificate/CertificateError'
 )('CertificateError', {
@@ -14,6 +18,10 @@ export class CertificateError extends Schema.TaggedError<CertificateError>(
   }
 }
 
+/**
+ * Reads the issuer of the TLS certificate of a site. `layerNode` reads it over
+ * a TLS connection.
+ */
 export class Certificate extends Context.Service<
   Certificate,
   {
@@ -21,6 +29,10 @@ export class Certificate extends Context.Service<
   }
 >()('@openwapp/collector/certificate/Certificate') {}
 
+/**
+ * Reads certificates with `node:tls`, on the port of the url or 443. Since
+ * certificates are not verified, expired and self-signed ones are read too.
+ */
 export const layerNode = Layer.succeed(
   Certificate,
   Certificate.of({

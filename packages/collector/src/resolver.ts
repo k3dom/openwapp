@@ -4,6 +4,10 @@ import Dns from 'node:dns/promises'
 import { Rule } from '@openwapp/matcher'
 import { Context, Effect, Layer, Predicate, Schema } from 'effect'
 
+/**
+ * The DNS records of a hostname could not be resolved. A hostname without
+ * records of the type is not an error.
+ */
 export class ResolverError extends Schema.TaggedError<ResolverError>(
   '@openwapp/collector/resolver/ResolverError'
 )('ResolverError', {
@@ -16,6 +20,10 @@ export class ResolverError extends Schema.TaggedError<ResolverError>(
   }
 }
 
+/**
+ * Resolves the DNS records of a hostname as strings, in the form rules match
+ * them. `layerNode` resolves them with `node:dns`.
+ */
 export class Resolver extends Context.Service<
   Resolver,
   {
@@ -78,10 +86,28 @@ const lookups: {
     (await resolver.resolveTxt(hostname)).map((chunks) => chunks.join('')),
 }
 
+/**
+ * Options of `layerNodeOptions`, along with the `timeout`, `tries` and
+ * `maxTimeout` of a `node:dns` resolver.
+ */
 export interface NodeOptions extends ResolverOptions {
+  /**
+   * Servers to query, in the format of `Dns.setServers`, such as `1.1.1.1` or
+   * `[2606:4700:4700::1111]:53`. Defaults to the servers Node.js uses.
+   */
   readonly servers?: ReadonlyArray<string>
 }
 
+/**
+ * Resolves DNS records with `node:dns`, configured by the given options.
+ *
+ * @example
+ * ```ts
+ * import { Resolver } from '@openwapp/collector'
+ *
+ * const layer = Resolver.layerNodeOptions({ servers: ['1.1.1.1'], timeout: 2000 })
+ * ```
+ */
 export const layerNodeOptions = ({ servers, ...options }: NodeOptions = {}) =>
   Layer.succeed(
     Resolver,
@@ -110,4 +136,7 @@ export const layerNodeOptions = ({ servers, ...options }: NodeOptions = {}) =>
     })
   )
 
+/**
+ * Resolves DNS records with `node:dns` and the servers Node.js uses.
+ */
 export const layerNode = layerNodeOptions()
