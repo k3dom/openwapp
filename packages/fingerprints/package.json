@@ -1,6 +1,6 @@
 {
   "name": "@openwapp/fingerprints",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The enthec/webappanalyzer technology fingerprints, kept in sync with upstream.",
   "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/fingerprints#readme",
   "bugs": {

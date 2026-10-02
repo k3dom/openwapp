@@ -1,6 +1,6 @@
 {
   "name": "@openwapp/collector",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Visits a website and reports which technologies it is built with.",
   "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/collector#readme",
   "bugs": {
