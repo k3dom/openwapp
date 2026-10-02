@@ -12,7 +12,8 @@ const NamesBySelector = Schema.ReadonlyMap(
  * What a catalog can make use of, so a collector gathers only that. Each field
  * matches the `Observation` field of the same name. A boolean says whether the
  * field is needed at all, and a set or map lists the names, types, paths or
- * selectors needed.
+ * selectors needed. Cookie names can hold a `*`, which stands for any run of
+ * characters.
  */
 export class Requirements extends Schema.Class<Requirements>(
   '@openwapp/matcher/requirements/Requirements'

@@ -74,6 +74,11 @@ describe('Matcher.match', () => {
       { cookie: new Map([['session', ['1']]]) },
     ],
     [
+      'a cookie name with a wildcard',
+      { cookies: { '_GA_*': '' } },
+      { cookie: new Map([['_ga_l7xq2bxp4n', ['GS1.1']]]) },
+    ],
+    [
       'meta',
       { meta: { generator: 'Example' } },
       { meta: new Map([['generator', ['Example']]]) },
@@ -124,6 +129,11 @@ describe('Matcher.match', () => {
       'the value sits under another selector',
       { dom: { a: { attributes: { href: '' } } } },
       { domAttribute: new Map([['link', new Map([['href', ['/']]])]]) },
+    ],
+    [
+      'a cookie name differs outside its wildcard',
+      { cookies: { 'a.b_*': '' } },
+      { cookie: new Map([['axb_1', ['1']]]) },
     ],
     [
       'the selector did not match',
@@ -586,6 +596,9 @@ describe('Matcher.match', () => {
     const observation = new Observation.Observation({
       meta: new Map([['generator', ['WordPress 6.5.2']]]),
       header: new Map([['x-powered-by', ['PHP/8.3.0']]]),
+      cookie: new Map([
+        ['_ga_l7xq2bxp4n', ['GS1.1.1700000000.1.0.1700000000.0']],
+      ]),
       scriptSrc: [
         'https://example.com/wp-content/plugins/woocommerce/assets/js/frontend/woocommerce.min.js?ver=8.7.0',
       ],
@@ -609,6 +622,7 @@ describe('Matcher.match', () => {
         'MySQL - 100',
         'jQuery 3.7.1 100',
         'Underscore.js 1.13.6 100',
+        'Google Analytics GA4 100',
       ])
     )
     expect(detections).not.toContainEqual(expect.stringMatching(/^Lodash /))

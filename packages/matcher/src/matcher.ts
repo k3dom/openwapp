@@ -104,8 +104,21 @@ export const match = (
     CertIssuer: ({ pattern }) => execute(pattern, observation.certIssuer),
     Header: ({ name, pattern }) =>
       execute(pattern, observation.header.get(name)),
-    Cookie: ({ name, pattern }) =>
-      execute(pattern, observation.cookie.get(name)),
+    Cookie: ({ name, pattern }) => {
+      if (!name.includes('*')) {
+        return execute(pattern, observation.cookie.get(name))
+      }
+      const glob = new RegExp(
+        `^${name.replaceAll(/[\\^$.+?()[\]{}|]/g, '\\$&').replaceAll('*', '.*')}$`,
+        's'
+      )
+      return execute(
+        pattern,
+        [...observation.cookie]
+          .filter(([observedName]) => glob.test(observedName))
+          .flatMap(([, values]) => values)
+      )
+    },
     Meta: ({ name, pattern }) => execute(pattern, observation.meta.get(name)),
     Js: ({ property, pattern }) =>
       execute(pattern, observation.js.get(property)),

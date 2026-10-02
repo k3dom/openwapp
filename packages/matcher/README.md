@@ -58,7 +58,9 @@ await Effect.runPromise(program)
 ### Observation
 
 An `Observation` holds what was observed on a site, with one field per rule tag.
-Fields default to empty. Header, cookie and meta names must be lowercase.
+Fields default to empty. Header, cookie and meta names must be lowercase. Store
+cookies under their real names, such as `_ga_l7xq2bxp4n`. A `*` in the cookie
+name of a rule, as in `_ga_*`, stands for any run of characters.
 
 ```ts
 import { Observation } from '@openwapp/matcher'

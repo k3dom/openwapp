@@ -29,6 +29,8 @@ export const LowercaseName = Schema.String.check(Schema.isLowercased())
  * A single check of a technology, tagged by what it looks at. Each tag reads
  * the `Observation` field of the same name, such as `ScriptSrc` and
  * `scriptSrc`. Every tag but `DomExists` matches a `pattern` against it.
+ *
+ * A `*` in a `Cookie` name stands for any run of characters.
  */
 export const Rule = Schema.TaggedUnion({
   Url: { pattern: Pattern.Pattern },
