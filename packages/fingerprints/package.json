@@ -14,10 +14,17 @@
   },
   "files": [
     "data",
+    "index.js",
+    "index.d.ts",
     "README.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
     "./*": "./data/*",
     "./package.json": "./package.json"
   },

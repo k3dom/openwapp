@@ -17,6 +17,20 @@ The upstream files are shipped unmodified under `data/`.
 
 Icons are not included.
 
+## Usage
+
+The default export holds every fingerprint in one object of `technologies`,
+`categories` and `groups`, ready for `Catalog.decode` from `@openwapp/matcher`.
+
+```ts
+import fingerprints from '@openwapp/fingerprints'
+import { Catalog } from '@openwapp/matcher'
+
+const catalog = Catalog.decodeSync(fingerprints)
+```
+
+Each file under `data/` can be imported on its own as well.
+
 ```ts
 import categories from '@openwapp/fingerprints/categories.json' with { type: 'json' }
 ```
