@@ -117,6 +117,19 @@ describe('Markup.extract', () => {
     ])
   })
 
+  it('leaves out scripts embedded as data uris', () => {
+    const markup = Markup.extract(
+      `<script src="data:text/javascript;base64,YWxlcnQoMSk="></script>
+        <script src=" DATA:application/javascript,jquery()"></script>
+        <script src="&#1;data:text/javascript,jquery()"></script>
+        <script src="da&#10;ta:text/javascript,jquery()"></script>
+        <script src="/data:app.js"></script>`,
+      'https://example.com/',
+      requirementsOf({ Example: { scriptSrc: ['jquery'] } })
+    )
+    expect(markup.scriptSrc).toEqual(['https://example.com/data:app.js'])
+  })
+
   it('resolves script urls against the base url of the document', () => {
     const markup = Markup.extract(
       `<head>

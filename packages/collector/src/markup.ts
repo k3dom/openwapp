@@ -58,7 +58,9 @@ export const extract = (
     scriptSrc: requirements.scriptSrc
       ? scripts.flatMap((script) => {
           const src = getAttributeValue(script, 'src')?.trim()
-          return src ? [URL.parse(src, base)?.href ?? src] : []
+          if (!src) return []
+          const parsed = URL.parse(src, base)
+          return parsed?.protocol === 'data:' ? [] : [parsed?.href ?? src]
         })
       : [],
     meta: new Map(
