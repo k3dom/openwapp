@@ -1,18 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
-
 import { describe, expect, it } from '@effect/vitest'
+import fingerprints from '@openwapp/fingerprints'
 import { Effect } from 'effect'
 
 import * as Catalog from '#/catalog.ts'
 import * as Category from '#/category.ts'
 import * as Group from '#/group.ts'
 import * as Technology from '#/technology.ts'
-
-const resolve = createRequire(import.meta.url).resolve
-const read = (path: string): Record<string, unknown> =>
-  JSON.parse(readFileSync(resolve(`@openwapp/fingerprints/${path}`), 'utf8'))
 
 const withExample = (technology: object) => ({
   technologies: {
@@ -26,20 +19,8 @@ const withExample = (technology: object) => ({
 describe('Catalog.decode', () => {
   it.effect('decodes the upstream fingerprints', () =>
     Effect.gen(function* () {
-      const technologies = Object.assign(
-        {},
-        ...readdirSync(
-          dirname(resolve('@openwapp/fingerprints/technologies/a.json'))
-        ).map((file) => read(join('technologies', file)))
-      )
-      const categories = read('categories.json')
-      const groups = read('groups.json')
-
-      const catalog = yield* Catalog.decode({
-        technologies,
-        categories,
-        groups,
-      })
+      const { technologies, categories, groups } = fingerprints
+      const catalog = yield* Catalog.decode(fingerprints)
 
       expect(catalog).toBeInstanceOf(Catalog.Catalog)
       expect([...catalog.technologies.keys()]).toEqual(

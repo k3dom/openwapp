@@ -1,21 +1,29 @@
 import { Effect, Schema } from 'effect'
 
 import * as Category from '#/category.ts'
+import * as Fingerprint from '#/fingerprint.ts'
 import * as Group from '#/group.ts'
 import * as Technology from '#/technology.ts'
 
+/**
+ * Technologies with their rules, the categories they belong to and the groups
+ * of those categories. Build one with `decode` or `decodeSync`.
+ */
 export class Catalog extends Schema.Class<Catalog>(
   '@openwapp/matcher/catalog/Catalog'
 )({
+  /** Technologies by name, in the order of the fingerprints. */
   technologies: Schema.ReadonlyMap(Schema.String, Technology.Technology),
+  /** Categories by id. */
   categories: Schema.ReadonlyMap(Schema.Int, Category.Category),
+  /** Groups by id. */
   groups: Schema.ReadonlyMap(Schema.Int, Group.Group),
 }) {}
 
-export const FromJson = Schema.Struct({
-  technologies: Technology.FromJson,
-  categories: Category.FromJson,
-  groups: Group.FromJson,
+const FromJson = Schema.Struct({
+  technologies: Fingerprint.Technologies,
+  categories: Fingerprint.Categories,
+  groups: Fingerprint.Groups,
 })
   .check(
     Schema.makeFilter(({ technologies, categories, groups }) =>
@@ -63,6 +71,11 @@ export const FromJson = Schema.Struct({
   )
   .pipe(Schema.decodeTo(Catalog))
 
+/**
+ * The fingerprints given to `decode` are invalid. The message lists every
+ * invalid fingerprint and every reference to an unknown technology, category
+ * or group.
+ */
 export class CatalogError extends Schema.TaggedError<CatalogError>(
   '@openwapp/matcher/catalog/CatalogError'
 )('CatalogError', {
@@ -73,10 +86,34 @@ export class CatalogError extends Schema.TaggedError<CatalogError>(
   }
 }
 
+/**
+ * Decodes fingerprints in the
+ * [webappanalyzer format](https://github.com/enthec/webappanalyzer#specification)
+ * into a `Catalog`. The input is an object of `technologies`, `categories` and
+ * `groups`, which is what `@openwapp/fingerprints` exports by default.
+ *
+ * Fails with a `CatalogError` when the fingerprints are invalid. Use
+ * `decodeSync` to get the catalog without Effect.
+ */
 export const decode = (input: unknown) =>
   Schema.decodeUnknownEffect(FromJson)(input, {
     errors: 'all',
     onExcessProperty: 'error',
   }).pipe(Effect.mapError((cause) => new CatalogError({ cause })))
 
+/**
+ * Decodes fingerprints in the
+ * [webappanalyzer format](https://github.com/enthec/webappanalyzer#specification)
+ * into a `Catalog`, like `decode` but without Effect.
+ *
+ * @throws {CatalogError} When the fingerprints are invalid.
+ *
+ * @example
+ * ```ts
+ * import fingerprints from '@openwapp/fingerprints'
+ * import { Catalog } from '@openwapp/matcher'
+ *
+ * const catalog = Catalog.decodeSync(fingerprints)
+ * ```
+ */
 export const decodeSync = (input: unknown) => Effect.runSync(decode(input))

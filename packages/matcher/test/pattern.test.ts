@@ -1,11 +1,12 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Schema } from 'effect'
 
+import * as Fingerprint from '#/fingerprint.ts'
 import * as Pattern from '#/pattern.ts'
 
-const decode = Schema.decodeUnknownSync(Pattern.FromString)
+const decode = Schema.decodeUnknownSync(Fingerprint.PatternString)
 
-describe('Pattern.FromString', () => {
+describe('Fingerprint.PatternString', () => {
   it('compiles a case-insensitive regex with full confidence and no version', () => {
     const pattern = decode('^WordPress$')
     expect(pattern).toBeInstanceOf(Pattern.Pattern)

@@ -3,6 +3,15 @@
 Turns the fingerprints into a typed catalog and matches it against what was
 observed on a site.
 
+## Install
+
+```sh
+pnpm add @openwapp/matcher effect
+```
+
+`effect` is a peer dependency, so install it even when you do not use Effect
+yourself. Every function that returns an Effect has a plain counterpart.
+
 ## Usage
 
 ### Catalog
@@ -11,28 +20,11 @@ observed on a site.
 [webappanalyzer format](https://github.com/enthec/webappanalyzer#specification)
 into a `Catalog`. It fails with a `CatalogError` listing every invalid
 fingerprint and unknown reference. Load the fingerprints from
-`@openwapp/fingerprints` or bring your own.
+`@openwapp/fingerprints` or bring your own object of `technologies`,
+`categories` and `groups`.
 
 ```ts
-import { readdir, readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
-
-const resolve = createRequire(import.meta.url).resolve
-const read = async (path: string) =>
-  JSON.parse(await readFile(resolve(`@openwapp/fingerprints/${path}`), 'utf8'))
-
-const directory = dirname(resolve('@openwapp/fingerprints/technologies/a.json'))
-const input = {
-  technologies: Object.assign(
-    {},
-    ...(await Promise.all(
-      (await readdir(directory)).map((file) => read(join('technologies', file)))
-    ))
-  ),
-  categories: await read('categories.json'),
-  groups: await read('groups.json'),
-}
+import fingerprints from '@openwapp/fingerprints'
 ```
 
 **Without Effect**, `Catalog.decodeSync` throws the `CatalogError`.
@@ -41,7 +33,7 @@ const input = {
 import { Catalog } from '@openwapp/matcher'
 
 try {
-  const catalog = Catalog.decodeSync(input)
+  const catalog = Catalog.decodeSync(fingerprints)
   console.log(catalog.technologies.size)
 } catch (error) {
   if (error instanceof Catalog.CatalogError) console.error(error.message)
@@ -55,7 +47,7 @@ try {
 import { Catalog } from '@openwapp/matcher'
 import { Console, Effect } from 'effect'
 
-const program = Catalog.decode(input).pipe(
+const program = Catalog.decode(fingerprints).pipe(
   Effect.flatMap((catalog) => Console.log(catalog.technologies.size)),
   Effect.catchTag('CatalogError', (error) => Console.error(error.message))
 )
@@ -91,6 +83,16 @@ import { Requirements } from '@openwapp/matcher'
 
 const requirements = Requirements.fromCatalog(catalog)
 console.log(requirements.robots, [...requirements.js])
+```
+
+To skip a source, empty its field in a copy:
+
+```ts
+const withoutDns = new Requirements.Requirements({
+  ...requirements,
+  dns: new Set(),
+  certIssuer: false,
+})
 ```
 
 ### Matcher

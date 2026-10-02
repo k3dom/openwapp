@@ -53,6 +53,11 @@ Do not read git stashes unless explicitly instructed.
 **Default to zero comments.** Write one only when the information is essential
 and cannot be inferred from the code itself. If unsure, it is not needed.
 
+**Public exports are the exception.** Everything reachable from a package's
+`src/index.ts` gets a JSDoc, since it ships in the published `.d.ts` and is all
+an editor shows. Say what it does, what it fails, throws or rejects with, and
+what a caller cannot see from the types. Add an `@example` only to entry points.
+
 ### Functions
 
 **Default to inlining logic.** Reading straight down and having logic be

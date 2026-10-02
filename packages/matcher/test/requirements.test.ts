@@ -1,18 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
-
 import { describe, expect, it } from '@effect/vitest'
+import fingerprints from '@openwapp/fingerprints'
 
 import * as Catalog from '#/catalog.ts'
 import * as Observation from '#/observation.ts'
 import * as Requirements from '#/requirements.ts'
 
 type Fields = ConstructorParameters<typeof Requirements.Requirements>[0]
-
-const resolve = createRequire(import.meta.url).resolve
-const read = (path: string): Record<string, unknown> =>
-  JSON.parse(readFileSync(resolve(`@openwapp/fingerprints/${path}`), 'utf8'))
 
 const requirementsOf = (technologies: Record<string, object>) =>
   Requirements.fromCatalog(
@@ -182,16 +175,7 @@ describe('Requirements.fromCatalog', () => {
 
   it('lists what to gather for the upstream fingerprints', () => {
     const requirements = Requirements.fromCatalog(
-      Catalog.decodeSync({
-        technologies: Object.assign(
-          {},
-          ...readdirSync(
-            dirname(resolve('@openwapp/fingerprints/technologies/a.json'))
-          ).map((file) => read(join('technologies', file)))
-        ),
-        categories: read('categories.json'),
-        groups: read('groups.json'),
-      })
+      Catalog.decodeSync(fingerprints)
     )
 
     expect(requirements.url).toBe(true)

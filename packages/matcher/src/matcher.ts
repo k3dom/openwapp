@@ -6,11 +6,24 @@ import * as Pattern from '#/pattern.ts'
 import * as Rule from '#/rule.ts'
 import * as Technology from '#/technology.ts'
 
+/**
+ * A technology that `match` found in an observation.
+ */
 export class Detection extends Schema.Class<Detection>(
   '@openwapp/matcher/matcher/Detection'
 )({
   technology: Technology.Technology,
+  /**
+   * How sure the match is, from 0 to 100. The confidences of the matching
+   * rules add up, and an implication passes on at most the confidence of the
+   * technology implying it.
+   */
   confidence: Pattern.Confidence,
+  /**
+   * The longest version that the rules found or an implication set. Values
+   * that look like hashes or build numbers are skipped. Left out when no
+   * version was found.
+   */
   version: Schema.optionalKey(Schema.String),
 }) {}
 
@@ -42,6 +55,25 @@ const resolveVersion = (
         .join('')
         .trim()
 
+/**
+ * Finds the technologies of a catalog in an observation.
+ *
+ * Runs the rules of every technology against the observation and follows the
+ * `requires`, `implies` and `excludes` relations between technologies. Returns
+ * one `Detection` per technology found, in catalog order.
+ *
+ * @example
+ * ```ts
+ * import { Matcher, Observation } from '@openwapp/matcher'
+ *
+ * const detections = Matcher.match(
+ *   catalog,
+ *   new Observation.Observation({
+ *     header: new Map([['x-powered-by', ['PHP/8.3.0']]]),
+ *   })
+ * )
+ * ```
+ */
 export const match = (
   catalog: Catalog.Catalog,
   observation: Observation.Observation

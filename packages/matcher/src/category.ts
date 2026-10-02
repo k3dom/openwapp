@@ -1,28 +1,15 @@
-import { Schema, SchemaGetter, Struct } from 'effect'
+import { Schema } from 'effect'
 
+/**
+ * A category of technologies, such as CMS or Analytics.
+ */
 export class Category extends Schema.Class<Category>(
   '@openwapp/matcher/category/Category'
 )({
   id: Schema.Int,
   name: Schema.String,
+  /** Lower numbers rank higher, such as 1 for CMS and 9 for Widgets. */
   priority: Schema.Int,
+  /** Ids of the groups the category belongs to. */
   groups: Schema.Array(Schema.Int),
 }) {}
-
-export const FromJson = Schema.Record(
-  Schema.String,
-  Schema.Struct(Struct.omit(Category.fields, ['id']))
-).pipe(
-  Schema.decodeTo(Schema.ReadonlyMap(Schema.Int, Category), {
-    decode: SchemaGetter.transform(
-      (categories) =>
-        new Map(
-          Object.entries(categories).map(([key, category]) => {
-            const id = Number(key)
-            return [id, { id, ...category }]
-          })
-        )
-    ),
-    encode: SchemaGetter.forbiddenEncoding,
-  })
-)

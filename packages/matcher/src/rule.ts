@@ -2,6 +2,9 @@ import { Schema } from 'effect'
 
 import * as Pattern from '#/pattern.ts'
 
+/**
+ * The DNS record types rules can match.
+ */
 export const DnsRecordType = Schema.Literals([
   'A',
   'AAAA',
@@ -17,8 +20,16 @@ export const DnsRecordType = Schema.Literals([
 ])
 export type DnsRecordType = typeof DnsRecordType.Type
 
+/**
+ * A lowercase string, the form header, cookie and meta names take.
+ */
 export const LowercaseName = Schema.String.check(Schema.isLowercased())
 
+/**
+ * A single check of a technology, tagged by what it looks at. Each tag reads
+ * the `Observation` field of the same name, such as `ScriptSrc` and
+ * `scriptSrc`. Every tag but `DomExists` matches a `pattern` against it.
+ */
 export const Rule = Schema.TaggedUnion({
   Url: { pattern: Pattern.Pattern },
   Html: { pattern: Pattern.Pattern },

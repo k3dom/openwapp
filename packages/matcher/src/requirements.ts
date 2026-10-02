@@ -8,6 +8,12 @@ const NamesBySelector = Schema.ReadonlyMap(
   Schema.ReadonlySet(Schema.String)
 )
 
+/**
+ * What a catalog can make use of, so a collector gathers only that. Each field
+ * matches the `Observation` field of the same name. A boolean says whether the
+ * field is needed at all, and a set or map lists the names, types, paths or
+ * selectors needed.
+ */
 export class Requirements extends Schema.Class<Requirements>(
   '@openwapp/matcher/requirements/Requirements'
 )({
@@ -32,6 +38,21 @@ export class Requirements extends Schema.Class<Requirements>(
   domProperty: NamesBySelector,
 }) {}
 
+/**
+ * Lists what the rules of a catalog look at.
+ *
+ * @example
+ * ```ts
+ * import { Requirements } from '@openwapp/matcher'
+ *
+ * const requirements = Requirements.fromCatalog(catalog)
+ * const withoutDns = new Requirements.Requirements({
+ *   ...requirements,
+ *   dns: new Set(),
+ *   certIssuer: false,
+ * })
+ * ```
+ */
 export const fromCatalog = (catalog: Catalog.Catalog) => {
   const rules = [...catalog.technologies.values()].flatMap(({ rules }) => rules)
   const of = <const Tag extends Rule.Rule['_tag']>(tag: Tag) =>

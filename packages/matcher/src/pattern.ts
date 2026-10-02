@@ -1,15 +1,17 @@
-import {
-  Effect,
-  Schema,
-  SchemaGetter,
-  SchemaIssue,
-  SchemaTransformation,
-} from 'effect'
+import { Schema } from 'effect'
 
+/**
+ * An integer from 0 to 100.
+ */
 export const Confidence = Schema.Int.check(
   Schema.isBetween({ minimum: 0, maximum: 100 })
 )
 
+/**
+ * A part of a version template. `Text` is taken as is, `Capture` inserts a
+ * regex group and `Conditional` inserts `present` or `absent` depending on
+ * whether a group matched.
+ */
 export const VersionPart = Schema.TaggedUnion({
   Text: { value: Schema.String },
   Capture: { group: Schema.Int },
@@ -21,113 +23,25 @@ export const VersionPart = Schema.TaggedUnion({
 })
 export type VersionPart = typeof VersionPart.Type
 
+/**
+ * A version template, decoded from the `\1` and `\1?present:absent` syntax of
+ * a `version` tag.
+ */
 export const Version = Schema.Array(VersionPart)
 export type Version = typeof Version.Type
 
+/**
+ * A compiled pattern of a rule.
+ */
 export class Pattern extends Schema.Class<Pattern>(
   '@openwapp/matcher/pattern/Pattern'
 )({
+  /**
+   * Case-insensitive, with unbounded quantifiers capped at 250 repetitions.
+   */
   regex: Schema.RegExp,
+  /** Confidence the pattern adds when it matches. */
   confidence: Confidence,
+  /** How to build a version from the groups the regex captured. */
   version: Version,
 }) {}
-
-export const TaggedString = Schema.String.pipe(
-  Schema.decodeTo(
-    Schema.Struct({
-      value: Schema.String,
-      confidence: Schema.String.check(Schema.isPattern(/^\d+$/)).pipe(
-        Schema.decodeTo(Confidence, SchemaTransformation.numberFromString)
-      ),
-      version: Schema.String.pipe(
-        Schema.decodeTo(Version, {
-          decode: SchemaGetter.transform((template) => {
-            const [, head = template, group, present = '', absent = ''] =
-              /^(.*?)\\(\d)\?([^:]*):(.*)$/s.exec(template) ?? []
-            const parts = head
-              .split(/\\(\d)/)
-              .flatMap((text, index): ReadonlyArray<VersionPart> => {
-                if (index % 2 === 1) {
-                  return [{ _tag: 'Capture', group: Number(text) }]
-                }
-                return text === '' ? [] : [{ _tag: 'Text', value: text }]
-              })
-            return group === undefined
-              ? parts
-              : [
-                  ...parts,
-                  {
-                    _tag: 'Conditional',
-                    group: Number(group),
-                    present,
-                    absent,
-                  },
-                ]
-          }),
-          encode: SchemaGetter.forbiddenEncoding,
-        })
-      ),
-    }),
-    {
-      decode: SchemaGetter.transformEffect((input, options) => {
-        const [value = '', ...tags] = input.split('\\;')
-        let confidence = '100'
-        let version = ''
-        for (const tag of tags) {
-          const [, key, argument = ''] =
-            /^(confidence|version):(.*)$/s.exec(tag) ?? []
-          if (key === 'confidence') confidence = argument
-          else if (key === 'version') version = argument
-          else {
-            return Effect.fail(
-              new SchemaIssue.InvalidValue(
-                {
-                  message: `Expected a confidence or version tag, got "${tag}"`,
-                },
-                input,
-                options
-              )
-            )
-          }
-        }
-        return Effect.succeed({ value, confidence, version })
-      }),
-      encode: SchemaGetter.forbiddenEncoding,
-    }
-  )
-)
-
-export const FromString = TaggedString.pipe(
-  Schema.decodeTo(Pattern, {
-    decode: SchemaGetter.transformEffect(
-      ({ value, confidence, version }, options) =>
-        Effect.try({
-          try: () => ({
-            // Bounded quantifiers keep a pattern from backtracking across a
-            // whole page.
-            regex: new RegExp(
-              value.replace(
-                /\\.|\[(?:\\.|[^\\\]])*\]|[+*]|\{(\d+),\}/gs,
-                (token, minimum?: string) => {
-                  if (token === '+') return '{1,250}'
-                  if (token === '*') return '{0,250}'
-                  if (minimum === undefined) return token
-                  return `{${minimum},${Math.max(Number(minimum), 250)}}`
-                }
-              ),
-              'i'
-            ),
-            confidence,
-            version,
-          }),
-          catch: (error) =>
-            new SchemaIssue.InvalidValue(
-              { message: String(error) },
-              value,
-              options
-            ),
-        })
-    ),
-    encode: SchemaGetter.forbiddenEncoding,
-  })
-)

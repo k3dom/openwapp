@@ -1,10 +1,11 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Schema } from 'effect'
 
+import * as Fingerprint from '#/fingerprint.ts'
 import * as Technology from '#/technology.ts'
 
 const decode = (fingerprint: object) =>
-  Schema.decodeUnknownSync(Technology.FromJson)(
+  Schema.decodeUnknownSync(Fingerprint.Technologies)(
     { Example: { cats: [1], website: 'https://example.com', ...fingerprint } },
     { onExcessProperty: 'error' }
   ).get('Example')
@@ -15,7 +16,7 @@ const pattern = (regex: RegExp, confidence = 100) => ({
   version: [],
 })
 
-describe('Technology.FromJson', () => {
+describe('Fingerprint.Technologies', () => {
   it('keys technologies by name and defaults the relations', () => {
     const technology = decode({
       description: 'An example.',
