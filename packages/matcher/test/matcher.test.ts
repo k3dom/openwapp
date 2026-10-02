@@ -197,6 +197,28 @@ describe('Matcher.match', () => {
       ['a present conditional', '(pro)?', '\\1?Pro:Free', 'pro', 'Pro'],
       ['an absent conditional', '(pro)?', '\\1?Pro:Free', 'basic', 'Free'],
       ['a missing capture', '(\\d)?x', '\\1', 'x', undefined],
+      [
+        'a capture of 10 characters',
+        '^(.+)$',
+        '\\1',
+        '1.2.3-rc.4',
+        '1.2.3-rc.4',
+      ],
+      [
+        'a capture over 10 characters',
+        '^(.+)$',
+        '\\1',
+        '1.2.3-rc.45',
+        undefined,
+      ],
+      ['text beside a long capture', '^(.+)$', 'v\\1', '1.2.3-rc.45', 'v'],
+      [
+        'a conditional on a long capture',
+        '^(.+)$',
+        '\\1?2+:',
+        'f0e1d2c3b4a5',
+        '2+',
+      ],
     ])('resolves %s', (_, regex, template, value, version) => {
       expect(
         detect(
@@ -225,13 +247,25 @@ describe('Matcher.match', () => {
     })
 
     it.each([
-      ['longer than 15 characters', '1.2.3-beta.12345'],
-      ['that looks like a timestamp', '1712345678'],
-    ])('ignores a version %s', (_, version) => {
+      ['longer than 15 characters', '1.2.3-\\1', 'beta.12345'],
+      ['that looks like a timestamp', '\\1', '1712345678'],
+    ])('ignores a version %s', (_, template, value) => {
       expect(
         detect(
-          { Example: { js: { 'Example.version': '^(.+)$\\;version:\\1' } } },
-          { js: new Map([['Example.version', ['1.2', version]]]) }
+          {
+            Example: {
+              js: {
+                'Example.version': '^(.+)$\\;version:\\1',
+                'Example.build': `^(.+)$\\;version:${template}`,
+              },
+            },
+          },
+          {
+            js: new Map([
+              ['Example.version', ['1.2']],
+              ['Example.build', [value]],
+            ]),
+          }
         )
       ).toEqual([{ ...example, version: '1.2' }])
     })

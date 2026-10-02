@@ -28,7 +28,12 @@ const resolveVersion = (
     .map((part) =>
       Pattern.VersionPart.match(part, {
         Text: ({ value }) => value,
-        Capture: ({ group }) => groups[group] ?? '',
+        // Captures longer than 10 characters are dropped from the version,
+        // while conditionals only check for presence.
+        Capture: ({ group }) => {
+          const capture = groups[group] ?? ''
+          return capture.length > 10 ? '' : capture
+        },
         Conditional: ({ group, present, absent }) =>
           groups[group] ? present : absent,
       })
