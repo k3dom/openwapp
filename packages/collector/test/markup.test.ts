@@ -150,7 +150,6 @@ describe('Markup.extract', () => {
         <meta name="generator" content="WooCommerce 8.4.0">
         <meta property="og:site_name" content="Example">
         <meta name="description" property="og:description" content="Shop">
-        <meta name="shareaholic:wp_version">
         <meta name="viewport" content="width=device-width">
         <meta charset="utf-8">`,
       'https://example.com/',
@@ -161,7 +160,6 @@ describe('Markup.extract', () => {
             'og:site_name': '',
             'og:description': '',
             description: '',
-            'shareaholic:wp_version': '',
           },
         },
       })
@@ -171,9 +169,25 @@ describe('Markup.extract', () => {
         ['generator', ['WordPress 6.4.2', 'WooCommerce 8.4.0']],
         ['og:site_name', ['Example']],
         ['description', ['Shop']],
-        ['shareaholic:wp_version', ['']],
       ])
     )
+  })
+
+  it('leaves out the meta tags without content', () => {
+    const markup = Markup.extract(
+      `<meta name="generator">
+        <meta name="generator" content="">
+        <meta name="generator" content=" ">
+        <meta name="ahrefs-site-verification">
+        <meta name="ahrefs-site-verification" content="">`,
+      'https://example.com/',
+      requirementsOf({
+        Example: {
+          meta: { generator: '', 'ahrefs-site-verification': '' },
+        },
+      })
+    )
+    expect(markup.meta).toEqual(new Map([['generator', [' ']]]))
   })
 
   it('extracts the selectors that exist in the document', () => {

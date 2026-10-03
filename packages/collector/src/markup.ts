@@ -70,8 +70,9 @@ export const extract = (
             getAttributeValue(meta, 'name') ||
             getAttributeValue(meta, 'property')
           )?.toLowerCase()
-          return name !== undefined && requirements.meta.has(name)
-            ? [{ name, content: getAttributeValue(meta, 'content') ?? '' }]
+          const content = getAttributeValue(meta, 'content')
+          return name && content && requirements.meta.has(name)
+            ? [{ name, content }]
             : []
         }),
         Array.groupBy(({ name }) => name),
