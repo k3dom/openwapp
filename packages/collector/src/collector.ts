@@ -12,9 +12,15 @@ import {
   Exit,
   Layer,
   Option,
+  Predicate,
   Result,
 } from 'effect'
-import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientRequest,
+  type HttpClientResponse,
+} from 'effect/http'
 import { NetAddress } from 'effect/net'
 
 import * as Body from '#/body.ts'
@@ -155,9 +161,18 @@ export const collect = Effect.fn('Collector.collect')(
     const site = URL.parse(snapshot.url.at(-1) ?? '') ?? target
     const client = (yield* HttpClient.HttpClient).pipe(
       HttpClient.mapRequest(HttpClientRequest.prependUrl(site.origin)),
-      HttpClient.followRedirects(),
-      HttpClient.filterStatusOk
+      HttpClient.followRedirects()
     )
+    const servesPath =
+      (path: string) => (response: HttpClientResponse.HttpClientResponse) =>
+        response.status >= 200 &&
+        response.status < 300 &&
+        HttpClientRequest.get(path).pipe(
+          HttpClientRequest.prependUrl(site.origin),
+          HttpClientRequest.toUrl,
+          Option.exists((url) => url.href === response.url)
+        )
+    const unknownPath = `/${crypto.randomUUID()}`
 
     const optional = <A, E>(effect: Effect.Effect<A, E>) =>
       effect.pipe(
@@ -167,7 +182,7 @@ export const collect = Effect.fn('Collector.collect')(
       )
     const fetchText = (path: string, limit?: number) =>
       optional(
-        client
+        HttpClient.filterStatusOk(client)
           .get(path)
           .pipe(Effect.flatMap((response) => Body.text(response, limit)))
       )
@@ -179,14 +194,39 @@ export const collect = Effect.fn('Collector.collect')(
               Effect.map(Option.toArray)
             )
           : Effect.succeed([]),
-        probe: Effect.forEach(
-          requirements.probe,
-          (path) =>
-            fetchText(path).pipe(
-              Effect.map(Option.map((body) => [path, Array.of(body)] as const))
-            ),
-          { concurrency: 'unbounded' }
-        ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
+        probe:
+          requirements.probe.size === 0
+            ? Effect.succeed(new Map())
+            : Effect.all(
+                {
+                  unknown: optional(client.get(unknownPath)),
+                  found: Effect.forEach(
+                    requirements.probe,
+                    (path) =>
+                      optional(
+                        client.get(path).pipe(
+                          Effect.filterOrFail(servesPath(path)),
+                          Effect.flatMap((response) => Body.text(response)),
+                          Effect.map((body) => [path, Array.of(body)] as const)
+                        )
+                      ),
+                    { concurrency: 'unbounded' }
+                  ),
+                },
+                { concurrency: 'unbounded' }
+              ).pipe(
+                Effect.map(
+                  ({ unknown, found }) =>
+                    new Map(
+                      Option.exists(
+                        unknown,
+                        Predicate.not(servesPath(unknownPath))
+                      )
+                        ? Array.getSomes(found)
+                        : []
+                    )
+                )
+              ),
         dns: Result.match(
           NetAddress.ipFromString(site.hostname.replace(/^\[|\]$/g, '')),
           {

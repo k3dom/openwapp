@@ -38,12 +38,14 @@ const site = (
   {
     records = {},
     issuers = {},
+    otherwise = () => new Response(null, { status: 404 }),
   }: {
     readonly records?: Record<
       string,
       Partial<Record<Rule.DnsRecordType, ReadonlyArray<string> | Error>>
     >
     readonly issuers?: Record<string, () => string | Error>
+    readonly otherwise?: () => Response | Error
   } = {}
 ) => {
   const resolved: Array<string> = []
@@ -64,7 +66,7 @@ const site = (
   const client = HttpClient.make((request, url) => {
     requested.push(url.href)
     headers.push(request.headers)
-    const response = routes[url.href]?.() ?? new Response(null, { status: 404 })
+    const response = routes[url.href]?.() ?? otherwise()
     return response instanceof Error
       ? Effect.fail(
           new HttpClientError.HttpClientError({
@@ -455,6 +457,84 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect('observes no probes on a site that answers every path', () => {
+    const { layer, requested } = site(
+      {},
+      { otherwise: () => new Response('<html>App</html>') }
+    )
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { probe: { '/version': '' } } })
+      )
+      expect(observation.probe).toEqual(new Map())
+      expect(requested).toContainEqual(
+        expect.stringMatching(/^https:\/\/example\.com\/[\da-f-]{36}$/)
+      )
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect(
+    'keeps only the probes the site answers without redirecting',
+    () => {
+      const { layer } = site(
+        {
+          'https://example.com/': () => new Response('<html>Home</html>'),
+          'https://example.com/version': () => new Response('Example 1.0'),
+        },
+        {
+          otherwise: () =>
+            new Response(null, {
+              status: 302,
+              headers: { location: 'https://example.com/' },
+            }),
+        }
+      )
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({
+            Example: { probe: { '/version': '' } },
+            Other: { probe: { '/other': '' } },
+          })
+        )
+        expect(observation.probe).toEqual(
+          new Map([['/version', ['Example 1.0']]])
+        )
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect('observes no probes when the random path cannot be loaded', () => {
+    const { layer } = site(
+      {
+        'https://example.com/': () => new Response(''),
+        'https://example.com/version': () => new Response('Example 1.0'),
+      },
+      { otherwise: () => new Error('connection reset') }
+    )
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { probe: { '/version': '' } } })
+      )
+      expect(observation.probe).toEqual(new Map())
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect('requests no random path when the catalog has no probes', () => {
+    const { layer, requested } = site({
+      'https://example.com/': () => new Response(''),
+    })
+    return Effect.gen(function* () {
+      yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { html: ['example'] } })
+      )
+      expect(requested).toEqual(['https://example.com/'])
+    }).pipe(Effect.provide(layer))
+  })
+
   it.effect('probes paths at the root of the site', () => {
     const { layer, requested } = site({
       'https://example.com/': () => new Response(''),
@@ -474,7 +554,10 @@ describe('Collector.collect', () => {
         })
       )
       expect(requested).toContain('https://example.com/version')
-      expect(requested).toHaveLength(5)
+      expect(requested).toContainEqual(
+        expect.stringMatching(/^https:\/\/example\.com\/[\da-f-]{36}$/)
+      )
+      expect(requested).toHaveLength(6)
       expect(
         requested.filter((url) => !url.startsWith('https://example.com/'))
       ).toEqual([])
@@ -542,12 +625,18 @@ describe('Collector.collect', () => {
           new Map([['MX', ['10 mx.example.org']]])
         )
         expect(observation.certIssuer).toEqual(['O=Example CA'])
-        expect(requested.toSorted()).toEqual([
-          'http://example.com/',
-          'https://www.example.org/',
-          'https://www.example.org/robots.txt',
-          'https://www.example.org/version',
-        ])
+        expect(requested).toHaveLength(5)
+        expect(requested).toEqual(
+          expect.arrayContaining([
+            'http://example.com/',
+            'https://www.example.org/',
+            expect.stringMatching(
+              /^https:\/\/www\.example\.org\/[\da-f-]{36}$/
+            ),
+            'https://www.example.org/robots.txt',
+            'https://www.example.org/version',
+          ])
+        )
         expect(resolved.toSorted()).toEqual([
           'CNAME www.example.org',
           'MX example.org',
@@ -944,6 +1033,31 @@ describe('Collector.layer', () => {
           'accept-language': 'en-US,en;q=0.9',
         })
       }
+    }).pipe(Effect.provide(Collector.layer))
+  )
+
+  it.live('ignores probes the server answers after a redirect', () =>
+    Effect.gen(function* () {
+      const server = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          serve((request, response) => {
+            if (request.url === '/' || request.url === '/version') {
+              response.end(request.url)
+            } else {
+              response.writeHead(302, { location: '/' }).end()
+            }
+          })
+        ),
+        (server) => Effect.promise(server.close)
+      )
+      const observation = yield* Collector.collect(
+        server.url,
+        requirementsOf({
+          Example: { probe: { '/version': '' } },
+          Other: { probe: { '/other': '' } },
+        })
+      )
+      expect(observation.probe).toEqual(new Map([['/version', ['/version']]]))
     }).pipe(Effect.provide(Collector.layer))
   )
 })
