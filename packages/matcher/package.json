@@ -1,6 +1,6 @@
 {
   "name": "@openwapp/matcher",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Matches technology fingerprints against what was observed on a website.",
   "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/matcher#readme",
   "bugs": {
