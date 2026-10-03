@@ -22,6 +22,7 @@ import {
   type HttpClientResponse,
 } from 'effect/http'
 import { NetAddress } from 'effect/net'
+import { getDomain } from 'tldts'
 
 import * as Body from '#/body.ts'
 import * as Certificate from '#/certificate.ts'
@@ -231,8 +232,11 @@ export const collect = Effect.fn('Collector.collect')(
           NetAddress.ipFromString(site.hostname.replace(/^\[|\]$/g, '')),
           {
             onSuccess: () => Effect.succeed(new Map()),
-            onFailure: () =>
-              Effect.forEach(
+            onFailure: () => {
+              const domain =
+                getDomain(site.hostname, { allowPrivateDomains: true }) ??
+                site.hostname
+              return Effect.forEach(
                 requirements.dns,
                 (type) =>
                   optional(
@@ -242,7 +246,7 @@ export const collect = Effect.fn('Collector.collect')(
                       // to the exact host.
                       type === 'A' || type === 'AAAA' || type === 'CNAME'
                         ? site.hostname
-                        : site.hostname.replace(/^www\./, ''),
+                        : domain,
                       type
                     )
                   ).pipe(
@@ -254,7 +258,8 @@ export const collect = Effect.fn('Collector.collect')(
                     )
                   ),
                 { concurrency: 'unbounded' }
-              ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
+              ).pipe(Effect.map((found) => new Map(Array.getSomes(found))))
+            },
           }
         ),
         certIssuer:

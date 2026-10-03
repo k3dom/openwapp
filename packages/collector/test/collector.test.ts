@@ -782,6 +782,45 @@ describe('Collector.collect', () => {
     }).pipe(Effect.provide(layer))
   })
 
+  it.effect.each<[string, string]>([
+    ['blog.example.com', 'example.com'],
+    ['www.shop.example.co.uk', 'example.co.uk'],
+    ['blog.user.github.io', 'user.github.io'],
+    ['localhost', 'localhost'],
+  ])(
+    'resolves the addresses of %s on it and its other records on %s',
+    ([hostname, domain]) => {
+      const { layer, resolved } = site({
+        [`https://${hostname}/`]: () => new Response(''),
+      })
+      return Effect.gen(function* () {
+        yield* Collector.collect(
+          `https://${hostname}/`,
+          requirementsOf({
+            Example: {
+              dns: {
+                A: [''],
+                CNAME: [''],
+                MX: [''],
+                NS: [''],
+                SOA: [''],
+                TXT: [''],
+              },
+            },
+          })
+        )
+        expect(resolved.toSorted()).toEqual([
+          `A ${hostname}`,
+          `CNAME ${hostname}`,
+          `MX ${domain}`,
+          `NS ${domain}`,
+          `SOA ${domain}`,
+          `TXT ${domain}`,
+        ])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
   it.effect('resolves no dns records the catalog does not ask for', () => {
     const { layer, resolved } = site({
       'https://example.com/': () => new Response(''),

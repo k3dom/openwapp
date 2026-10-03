@@ -42,7 +42,8 @@
     "css-select": "7.0.0",
     "domutils": "4.0.2",
     "encoding-sniffer": "1.0.2",
-    "htmlparser2": "12.0.0"
+    "htmlparser2": "12.0.0",
+    "tldts": "7.4.16"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "0.18.5",
