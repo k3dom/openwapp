@@ -28,16 +28,25 @@ jobs:
         run: |
           previous="$(jq -r .commit packages/fingerprints/data/upstream.json)"
           packages/fingerprints/scripts/sync.sh
+          packages/icons/scripts/sync.sh
           commit="$(jq -r .commit packages/fingerprints/data/upstream.json)"
 
-          if git diff --quiet -- packages/fingerprints/data; then
+          packages=()
+          if [ -n "$(git status --porcelain -- packages/fingerprints/data)" ]; then
+            packages+=('"@openwapp/fingerprints": patch')
+          fi
+          if [ -n "$(git status --porcelain -- packages/icons/data ':!packages/icons/data/upstream.json')" ]; then
+            packages+=('"@openwapp/icons": patch')
+          fi
+
+          if [ "${#packages[@]}" -eq 0 ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           compare="https://github.com/enthec/webappanalyzer/compare/$previous...$commit"
-          printf -- '---\n"@openwapp/fingerprints": patch\n---\n\nSync with [enthec/webappanalyzer@%s](%s).\n' \
-            "${commit:0:7}" "$compare" > ".changeset/fingerprints-${commit:0:7}.md"
+          printf -- '---\n%s\n---\n\nSync with [enthec/webappanalyzer@%s](%s).\n' \
+            "$(printf '%s\n' "${packages[@]}")" "${commit:0:7}" "$compare" > ".changeset/fingerprints-${commit:0:7}.md"
 
           {
             echo "changed=true"
@@ -58,6 +67,6 @@ jobs:
             'feat(fingerprints): sync with enthec/webappanalyzer@${{
             steps.sync.outputs.short }}'
           body: |
-            Syncs the fingerprints with upstream.
+            Syncs the fingerprints and their icons with upstream.
 
             Changes: ${{ steps.sync.outputs.compare }}

@@ -1,0 +1,40 @@
+{
+  "name": "@openwapp/icons",
+  "version": "0.0.0",
+  "description": "The enthec/webappanalyzer technology icons, kept in sync with upstream.",
+  "homepage": "https://github.com/k3dom/openwapp/tree/master/packages/icons#readme",
+  "bugs": {
+    "url": "https://github.com/k3dom/openwapp/issues"
+  },
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k3dom/openwapp.git",
+    "directory": "packages/icons"
+  },
+  "files": [
+    "data",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./*": "./data/*",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "sync": "scripts/sync.sh",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "node --test",
+    "check": "pnpm run format:check"
+  },
+  "devDependencies": {
+    "@openwapp/fingerprints": "workspace:*",
+    "@openwapp/oxfmt": "workspace:*",
+    "oxfmt": "0.68.0"
+  }
+}

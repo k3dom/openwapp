@@ -15,11 +15,11 @@ the community maintained
 
 ## Licensing
 
-`packages/fingerprints` is GPL-3.0-only because it carries the upstream data.
-Everything else is MIT. MIT packages must never copy, bundle or depend on
-fingerprint data, so `@openwapp/fingerprints` may only appear in their
-`devDependencies`. The matcher takes a catalog as input and leaves loading the
-data to the user.
+`packages/fingerprints` and `packages/icons` are GPL-3.0-only because they carry
+the upstream data. Everything else is MIT. MIT packages must never copy, bundle
+or depend on fingerprint data or icons, so `@openwapp/fingerprints` and
+`@openwapp/icons` may only appear in their `devDependencies`. The matcher takes
+a catalog as input and leaves loading the data to the user.
 
 ## Agent skills
 

@@ -274,6 +274,18 @@ importers:
         specifier: 0.68.0
         version: 0.68.0
 
+  packages/icons:
+    devDependencies:
+      '@openwapp/fingerprints':
+        specifier: workspace:*
+        version: link:../fingerprints
+      '@openwapp/oxfmt':
+        specifier: workspace:*
+        version: link:../../tooling/oxfmt
+      oxfmt:
+        specifier: 0.68.0
+        version: 0.68.0
+
   packages/matcher:
     devDependencies:
       '@arethetypeswrong/core':
