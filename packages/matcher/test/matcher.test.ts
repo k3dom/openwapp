@@ -159,14 +159,29 @@ describe('Matcher.match', () => {
       expect(detect(technologies(3), { html: ['abcd'] })).toEqual([example])
     })
 
-    it('counts a rule once however many values it matches', () => {
-      expect(
-        detect(
-          { Example: { scriptSrc: ['example\\;confidence:50'] } },
-          { scriptSrc: ['/example-a.js', '/example-b.js'] }
-        )
-      ).toEqual([{ name: 'Example', confidence: 50 }])
-    })
+    it.each<[string, object, Fields]>([
+      [
+        'scriptSrc',
+        { scriptSrc: ['example\\;confidence:50'] },
+        { scriptSrc: ['/example-a.js', '/example-b.js'] },
+      ],
+      [
+        'domAttribute',
+        { dom: { link: { attributes: { href: 'example\\;confidence:50' } } } },
+        {
+          domAttribute: new Map([
+            ['link', new Map([['href', ['/example-a.css', '/example-b.css']]])],
+          ]),
+        },
+      ],
+    ])(
+      'counts a %s rule once however many values it matches',
+      (_, fingerprint, fields) => {
+        expect(detect({ Example: fingerprint }, fields)).toEqual([
+          { name: 'Example', confidence: 50 },
+        ])
+      }
+    )
 
     it('keeps the version but drops the detection of a zero confidence rule', () => {
       const technologies = {
