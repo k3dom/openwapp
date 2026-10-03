@@ -118,7 +118,7 @@ const serve = async (listener: RequestListener) => {
   }
 }
 
-const endless = (text: string) => {
+const endless = (text: string, prefix = '') => {
   const chunk = new TextEncoder().encode(text.repeat(64 * 1024))
   const stream = { cancelled: false }
   return {
@@ -126,6 +126,11 @@ const endless = (text: string) => {
     response: () =>
       new Response(
         new ReadableStream({
+          start: (controller) => {
+            if (prefix !== '') {
+              controller.enqueue(new TextEncoder().encode(prefix))
+            }
+          },
           pull: (controller) => controller.enqueue(chunk),
           cancel: () => {
             stream.cancelled = true
@@ -685,13 +690,189 @@ describe('Collector.collect', () => {
   })
 
   it.effect(
-    'reads the first 2 MiB of the page and of probes and 500 KiB of robots.txt',
+    'observes the external scripts and style sheets of its own site',
     () => {
-      const page = endless('a')
+      const { layer, requested } = site({
+        'https://www.example.com/shop/': () =>
+          new Response(
+            `<html><head>
+              <style>.inline {}</style>
+              <link rel="stylesheet" href="/main.css">
+              <link rel="stylesheet" href="https://cdn.example.net/widget.css">
+              <script>inline()</script>
+              <script src="app.js"></script>
+              <script src="/shop/app.js"></script>
+              <script src="https://static.example.com/vendor.js"></script>
+              <script src="https://www.googletagmanager.com/gtag/js"></script>
+              <script src="https://example.com.evil.net/a.js"></script>
+              <script src="data:text/javascript,data()"></script>
+              <script src="ftp://www.example.com/a.js"></script>
+            </head></html>`
+          ),
+        'https://www.example.com/main.css': () =>
+          new Response(':root { --tw-rotate: 0 }', {
+            headers: { 'content-type': 'text/css' },
+          }),
+        'https://www.example.com/shop/app.js': () => new Response('app()'),
+        'https://static.example.com/vendor.js': () => new Response('vendor()'),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://www.example.com/shop/',
+          requirementsOf({
+            Example: { scripts: ['example'], css: ['example'] },
+          })
+        )
+        expect(observation.script).toEqual(['inline()', 'app()', 'vendor()'])
+        expect(observation.css).toEqual([
+          '.inline {}',
+          ':root { --tw-rotate: 0 }',
+        ])
+        expect(observation.scriptSrc).toEqual([])
+        expect(requested.toSorted()).toEqual([
+          'https://static.example.com/vendor.js',
+          'https://www.example.com/main.css',
+          'https://www.example.com/shop/',
+          'https://www.example.com/shop/app.js',
+        ])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect(
+    'fetches no scripts or style sheets the catalog has no rules for',
+    () => {
+      const { layer, requested } = site({
+        'https://example.com/': () =>
+          new Response(
+            '<script src="/app.js"></script><link rel="stylesheet" href="/main.css">'
+          ),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({ Example: { scriptSrc: ['app'] } })
+        )
+        expect(observation.scriptSrc).toEqual(['https://example.com/app.js'])
+        expect(requested).toEqual(['https://example.com/'])
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect(
+    'leaves out scripts and style sheets that fail, are missing, are empty, are html or redirect off the site',
+    () => {
+      const { layer, requested } = site({
+        'https://example.com/': () =>
+          new Response(
+            `<script src="/reset.js"></script>
+            <script src="/missing.js"></script>
+            <script src="/empty.js"></script>
+            <script src="/fallback.js"></script>
+            <script src="/moved.js"></script>
+            <script src="/untyped.js"></script>
+            <script src="/gtag.js"></script>
+            <link rel="stylesheet" href="/fallback.css">`
+          ),
+        'https://example.com/reset.js': () => new Error('connection reset'),
+        'https://example.com/empty.js': () => new Response(' \n'),
+        'https://example.com/fallback.js': () =>
+          new Response('<html>wp-content</html>', {
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          }),
+        'https://example.com/fallback.css': () =>
+          new Response('<html>wp-content</html>', {
+            headers: { 'content-type': 'Text/HTML' },
+          }),
+        'https://example.com/moved.js': () =>
+          new Response(null, {
+            status: 301,
+            headers: { location: '/assets/moved.js' },
+          }),
+        'https://example.com/assets/moved.js': () =>
+          new Response('moved()', {
+            headers: { 'content-type': 'text/javascript' },
+          }),
+        'https://example.com/untyped.js': () =>
+          new Response(
+            new Blob(['\n <!DOCTYPE html><html>wp-content</html>']).stream()
+          ),
+        'https://example.com/gtag.js': () =>
+          new Response(null, {
+            status: 302,
+            headers: { location: 'https://www.googletagmanager.com/gtag/js' },
+          }),
+        'https://www.googletagmanager.com/gtag/js': () =>
+          new Response('var path = "/wp-content"'),
+      })
+      return Effect.gen(function* () {
+        const observation = yield* Collector.collect(
+          'https://example.com/',
+          requirementsOf({
+            Example: { scripts: ['example'], css: ['example'] },
+          })
+        )
+        expect(observation.script).toEqual(['moved()'])
+        expect(observation.css).toEqual([])
+        expect(requested).toContain('https://www.googletagmanager.com/gtag/js')
+      }).pipe(Effect.provide(layer))
+    }
+  )
+
+  it.effect.each<[string, number | undefined, number]>([
+    ['25 scripts and 25 style sheets by default', undefined, 25],
+    ['the given number of scripts and style sheets', 2, 2],
+    ['no scripts or style sheets for 0', 0, 0],
+  ])('fetches %s', ([, maxResources, expected]) => {
+    const urls = globalThis.Array.from(
+      { length: 30 },
+      (_, index) => `https://example.com/${index}`
+    )
+    const { layer, requested } = site({
+      'https://example.com/': () =>
+        new Response(
+          urls
+            .map(
+              (url) =>
+                `<script src="${url}.js"></script><link rel="stylesheet" href="${url}.css">`
+            )
+            .join('')
+        ),
+      ...Object.fromEntries(
+        urls.flatMap((url) => [
+          [`${url}.js`, () => new Response(`${url}.js`)],
+          [`${url}.css`, () => new Response(`${url}.css`)],
+        ])
+      ),
+    })
+    return Effect.gen(function* () {
+      const observation = yield* Collector.collect(
+        'https://example.com/',
+        requirementsOf({ Example: { scripts: ['example'], css: ['example'] } }),
+        { maxResources }
+      )
+      const first = urls.slice(0, expected)
+      expect(observation.script).toEqual(first.map((url) => `${url}.js`))
+      expect(observation.css).toEqual(first.map((url) => `${url}.css`))
+      expect(requested).toHaveLength(1 + 2 * expected)
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect(
+    'reads the first 2 MiB of the page and of probes and 500 KiB of robots.txt, scripts and style sheets',
+    () => {
+      const page = endless(
+        'a',
+        '<script src="/a.js"></script><link rel="stylesheet" href="/a.css">'
+      )
       const robots = endless('r')
       const probe = endless('p')
+      const script = endless('s')
+      const style = endless('c')
       const { layer } = site({
         'https://example.com/': page.response,
+        'https://example.com/a.js': script.response,
+        'https://example.com/a.css': style.response,
         'https://example.com/robots.txt': robots.response,
         'https://example.com/version': probe.response,
       })
@@ -699,17 +880,26 @@ describe('Collector.collect', () => {
         const observation = yield* Collector.collect(
           'https://example.com/',
           requirementsOf({
-            Example: { robots: ['r'], probe: { '/version': 'p' } },
+            Example: {
+              robots: ['r'],
+              probe: { '/version': 'p' },
+              scripts: ['s'],
+              css: ['c'],
+            },
           })
         )
-        expect(observation.html).toEqual(['a'.repeat(2 * 1024 * 1024)])
+        expect(observation.html[0]).toHaveLength(2 * 1024 * 1024)
         expect(observation.robots).toEqual(['r'.repeat(500 * 1024)])
         expect(observation.probe).toEqual(
           new Map([['/version', ['p'.repeat(2 * 1024 * 1024)]]])
         )
+        expect(observation.script).toEqual(['s'.repeat(500 * 1024)])
+        expect(observation.css).toEqual(['c'.repeat(500 * 1024)])
         expect(
-          [page, robots, probe].map(({ stream }) => stream.cancelled)
-        ).toEqual([true, true, true])
+          [page, robots, probe, script, style].map(
+            ({ stream }) => stream.cancelled
+          )
+        ).toEqual([true, true, true, true, true])
       }).pipe(Effect.provide(layer))
     }
   )
@@ -878,7 +1068,7 @@ describe('Collector.collect', () => {
     ([, lookupTimeout, millis]) =>
       Effect.gen(function* () {
         const started = yield* Deferred.make<void>()
-        let pending = 4
+        let pending = 6
         const hang = Effect.suspend(() => {
           pending -= 1
           if (pending === 0) Deferred.doneUnsafe(started, Effect.void)
@@ -892,6 +1082,8 @@ describe('Collector.collect', () => {
               probe: { '/version': '' },
               dns: { TXT: ['spf'] },
               certIssuer: 'Example',
+              scripts: ['example'],
+              css: ['example'],
             },
           }),
           { lookupTimeout }
@@ -910,7 +1102,9 @@ describe('Collector.collect', () => {
                       ? Effect.succeed(
                           HttpClientResponse.fromWeb(
                             request,
-                            new Response('page')
+                            new Response(
+                              '<script src="/a.js"></script><link rel="stylesheet" href="/a.css">'
+                            )
                           )
                         )
                       : hang
@@ -926,7 +1120,8 @@ describe('Collector.collect', () => {
         expect(fiber.pollUnsafe()).toBeUndefined()
         yield* TestClock.adjust('1 millis')
         const observation = yield* Fiber.join(fiber)
-        expect(observation.html).toEqual(['page'])
+        expect(observation.script).toEqual([])
+        expect(observation.css).toEqual([])
         expect(observation.robots).toEqual([])
         expect(observation.probe).toEqual(new Map())
         expect(observation.dns).toEqual(new Map())
@@ -1045,6 +1240,34 @@ describe('Collector.detect', () => {
       ])
     }).pipe(Effect.provide(layer))
   })
+  it.effect(
+    'detects technologies in the style sheets of the site but not in third party scripts',
+    () => {
+      const { layer } = site({
+        'https://example.com/': () =>
+          new Response(
+            `<link rel="stylesheet" href="/app.css">
+            <script async src="https://www.googletagmanager.com/gtag/js?id=G-1"></script>`
+          ),
+        'https://example.com/app.css': () =>
+          new Response('*, ::before { --tw-rotate: 0 }', {
+            headers: { 'content-type': 'text/css' },
+          }),
+        'https://www.googletagmanager.com/gtag/js?id=G-1': () =>
+          new Response('var paths = ["/wp-content", "/index.php?"]'),
+      })
+      return Effect.gen(function* () {
+        const detections = yield* Collector.detect(
+          Catalog.decodeSync(fingerprints),
+          'https://example.com/'
+        )
+        const names = detections.map(({ technology }) => technology.name)
+        expect(names).toContain('Tailwind CSS')
+        expect(names).not.toContain('WordPress')
+        expect(names).not.toContain('PHP')
+      }).pipe(Effect.provide(layer))
+    }
+  )
 })
 
 describe('Collector.layer', () => {

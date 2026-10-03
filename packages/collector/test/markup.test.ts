@@ -30,6 +30,8 @@ describe('Markup.extract', () => {
       requirementsOf({})
     )
     expect(markup).toEqual({
+      scriptUrls: [],
+      styleSheetUrls: [],
       text: [],
       css: [],
       script: [],
@@ -77,6 +79,40 @@ describe('Markup.extract', () => {
       ':root { --tw-rotate: 0 }',
       '.icon { fill: red }',
     ])
+  })
+
+  it('lists the style sheets the page links to', () => {
+    const markup = Markup.extract(
+      `<head><base href="/assets/"></head>
+        <link rel="stylesheet" href="main.css">
+        <link rel="Preload StyleSheet" href=" //cdn.example.net/a.css ">
+        <link rel="alternate stylesheet" href="/dark.css">
+        <link rel="stylesheets" href="/no.css">
+        <link rel="icon" href="/favicon.ico">
+        <link rel="stylesheet" href="">
+        <link rel="stylesheet" href="http://[invalid">`,
+      'https://example.com/shop/',
+      requirementsOf({ Example: { css: ['--tw-rotate'] } })
+    )
+    expect(markup.scriptUrls).toEqual([])
+    expect(markup.styleSheetUrls).toEqual([
+      'https://example.com/assets/main.css',
+      'https://cdn.example.net/a.css',
+      'https://example.com/dark.css',
+    ])
+  })
+
+  it('lists the external scripts when the catalog has scripts rules', () => {
+    const markup = Markup.extract(
+      `<script src="/app.js"></script>
+        <script>inline()</script>
+        <script src="data:text/javascript,app()"></script>`,
+      'https://example.com/',
+      requirementsOf({ Example: { scripts: ['app'] } })
+    )
+    expect(markup.scriptUrls).toEqual(['https://example.com/app.js'])
+    expect(markup.styleSheetUrls).toEqual([])
+    expect(markup.scriptSrc).toEqual([])
   })
 
   it('extracts the source of inline scripts', () => {

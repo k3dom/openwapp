@@ -57,10 +57,16 @@ export interface LayerOptions {
 export interface CollectOptions {
   /**
    * How long each lookup besides the page may take, which covers
-   * `/robots.txt`, probes, DNS records and the certificate. A lookup that takes
-   * longer is left out of the observation. Defaults to 10 seconds.
+   * `/robots.txt`, probes, scripts, style sheets, DNS records and the
+   * certificate. A lookup that takes longer is left out of the observation.
+   * Defaults to 10 seconds.
    */
   readonly lookupTimeout?: Duration.Input
+  /**
+   * How many external scripts and how many style sheets of the site are
+   * fetched. Defaults to 25 of each. Pass 0 to fetch none.
+   */
+  readonly maxResources?: number
 }
 
 /**
@@ -135,12 +141,13 @@ export const layer = layerOptions()
  *
  * Loads the page, following redirects, and reads the parts of its html the
  * requirements ask for. As far as they ask for it, it then fetches
- * `/robots.txt` and the probed paths from the final site, resolves its DNS
- * records and reads its certificate. Lookups that fail or time out are left
- * out of the observation.
+ * `/robots.txt`, the probed paths and the external scripts and style sheets
+ * of the site, resolves its DNS records and reads its certificate. Lookups
+ * that fail or time out are left out of the observation.
  *
  * Reads at most the first 2 MiB of the page and of each probe and the first
- * 500 KiB of `/robots.txt`. Only that part of a larger body is observed.
+ * 500 KiB of `/robots.txt` and of each script and style sheet. Only that part
+ * of a larger body is observed.
  *
  * Fails with a `PageError` when the page cannot be loaded. Provide `layer` or
  * `layerOptions` to run it. Use `collectPromise` to run it without Effect.
@@ -149,7 +156,7 @@ export const collect = Effect.fn('Collector.collect')(
   function* (
     url: string | URL,
     requirements: Requirements.Requirements,
-    { lookupTimeout = '10 seconds' }: CollectOptions = {}
+    { lookupTimeout = '10 seconds', maxResources = 25 }: CollectOptions = {}
   ) {
     const target = yield* Effect.try({
       try: () => new URL(url),
@@ -160,9 +167,21 @@ export const collect = Effect.fn('Collector.collect')(
     const resolver = yield* Resolver.Resolver
     const snapshot = yield* page.load(target, requirements)
     const site = URL.parse(snapshot.url.at(-1) ?? '') ?? target
-    const client = (yield* HttpClient.HttpClient).pipe(
+    const domain =
+      getDomain(site.hostname, { allowPrivateDomains: true }) ?? site.hostname
+    const http = yield* HttpClient.HttpClient
+    const client = http.pipe(
       HttpClient.mapRequest(HttpClientRequest.prependUrl(site.origin)),
       HttpClient.followRedirects()
+    )
+    const resourceClient = http.pipe(
+      HttpClient.followRedirects(),
+      HttpClient.filterStatusOk
+    )
+    const { scriptUrls, styleSheetUrls, ...markup } = Markup.extract(
+      snapshot.html.at(-1) ?? '',
+      site,
+      requirements
     )
     const servesPath =
       (path: string) => (response: HttpClientResponse.HttpClientResponse) =>
@@ -188,8 +207,50 @@ export const collect = Effect.fn('Collector.collect')(
           .pipe(Effect.flatMap((response) => Body.text(response, limit)))
       )
 
-    const fields = yield* Effect.all(
+    const sameSite = (url: string) => {
+      const parsed = URL.parse(url)
+      return (
+        (parsed?.protocol === 'http:' || parsed?.protocol === 'https:') &&
+        (getDomain(parsed.hostname, { allowPrivateDomains: true }) ??
+          parsed.hostname) === domain
+      )
+    }
+    const fetchResources = (urls: ReadonlyArray<string>) =>
+      Effect.forEach(
+        [...new Set(urls)].filter(sameSite).slice(0, Math.max(0, maxResources)),
+        (url) =>
+          optional(
+            resourceClient.get(url).pipe(
+              Effect.filterOrFail(
+                (response) => sameSite(response.url),
+                (response) =>
+                  new Error(`${url} redirected off the site to ${response.url}`)
+              ),
+              Effect.filterOrFail(
+                (response) =>
+                  !/^\s*text\/html\b/i.test(
+                    response.headers['content-type'] ?? ''
+                  ),
+                () => new Error(`${url} answered with html`)
+              ),
+              Effect.flatMap((response) => Body.text(response, 500 * 1024))
+            )
+          ),
+        { concurrency: 'unbounded' }
+      ).pipe(
+        Effect.map((bodies) =>
+          Array.getSomes(bodies).filter(
+            (body) =>
+              body.trim() !== '' &&
+              !/^\s*<(?:!doctype\s+html|html)\b/i.test(body)
+          )
+        )
+      )
+
+    const { externalScript, externalCss, ...fields } = yield* Effect.all(
       {
+        externalScript: fetchResources(scriptUrls),
+        externalCss: fetchResources(styleSheetUrls),
         robots: requirements.robots
           ? fetchText('/robots.txt', 500 * 1024).pipe(
               Effect.map(Option.toArray)
@@ -232,11 +293,8 @@ export const collect = Effect.fn('Collector.collect')(
           NetAddress.ipFromString(site.hostname.replace(/^\[|\]$/g, '')),
           {
             onSuccess: () => Effect.succeed(new Map()),
-            onFailure: () => {
-              const domain =
-                getDomain(site.hostname, { allowPrivateDomains: true }) ??
-                site.hostname
-              return Effect.forEach(
+            onFailure: () =>
+              Effect.forEach(
                 requirements.dns,
                 (type) =>
                   optional(
@@ -258,8 +316,7 @@ export const collect = Effect.fn('Collector.collect')(
                     )
                   ),
                 { concurrency: 'unbounded' }
-              ).pipe(Effect.map((found) => new Map(Array.getSomes(found))))
-            },
+              ).pipe(Effect.map((found) => new Map(Array.getSomes(found)))),
           }
         ),
         certIssuer:
@@ -273,8 +330,10 @@ export const collect = Effect.fn('Collector.collect')(
     )
     return new Observation.Observation({
       ...snapshot,
-      ...Markup.extract(snapshot.html.at(-1) ?? '', site, requirements),
+      ...markup,
       ...fields,
+      script: [...markup.script, ...externalScript],
+      css: [...markup.css, ...externalCss],
     })
   },
   Effect.provideService(HttpClient.TracerPropagationEnabled, false)

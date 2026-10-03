@@ -19,6 +19,12 @@ export const extract = (
     .map((base) => getAttributeValue(base, 'href'))
     .find((value) => value !== undefined)
   const base = URL.parse(href ?? '', url) ?? url
+  const scriptUrls = scripts.flatMap((script) => {
+    const src = getAttributeValue(script, 'src')?.trim()
+    if (!src) return []
+    const parsed = URL.parse(src, base)
+    return parsed?.protocol === 'data:' ? [] : [parsed?.href ?? src]
+  })
   const selected = new Map(
     [
       ...new Set([
@@ -37,6 +43,15 @@ export const extract = (
   )
 
   return {
+    scriptUrls: requirements.script ? scriptUrls : [],
+    styleSheetUrls: requirements.css
+      ? elements('link').flatMap((link) => {
+          const href = getAttributeValue(link, 'href')?.trim()
+          const rel = getAttributeValue(link, 'rel') ?? ''
+          if (!href || !/(?:^|\s)stylesheet(?:\s|$)/i.test(rel)) return []
+          return URL.parse(href, base)?.href ?? []
+        })
+      : [],
     text: requirements.text
       ? [
           // Unlike the body's textContent that Wappalyzer reads, innerText
@@ -55,14 +70,7 @@ export const extract = (
     script: requirements.script
       ? scripts.map(textContent).filter((script) => script.trim() !== '')
       : [],
-    scriptSrc: requirements.scriptSrc
-      ? scripts.flatMap((script) => {
-          const src = getAttributeValue(script, 'src')?.trim()
-          if (!src) return []
-          const parsed = URL.parse(src, base)
-          return parsed?.protocol === 'data:' ? [] : [parsed?.href ?? src]
-        })
-      : [],
+    scriptSrc: requirements.scriptSrc ? scriptUrls : [],
     meta: new Map(
       pipe(
         elements('meta').flatMap((meta) => {
