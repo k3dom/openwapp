@@ -42,27 +42,15 @@ examples, and understand implementation details.
 
 - Effect-TS (`.agents/repos/effect/`)
 
-## Rules
-
-Do not read git stashes unless explicitly instructed.
-
 ## Code style
 
 ### Comments
 
-**Default to zero comments.** Write one only when the information is essential
-and cannot be inferred from the code itself. If unsure, it is not needed.
-
-**Public exports are the exception.** Everything reachable from a package's
-`src/index.ts` gets a JSDoc, since it ships in the published `.d.ts` and is all
-an editor shows. Say what it does, what it fails, throws or rejects with, and
-what a caller cannot see from the types. Add an `@example` only to entry points.
-
-### Functions
-
-**Default to inlining logic.** Reading straight down and having logic be
-co-located beats jumping between definitions. Keep logic inline when a function
-would only name a few lines used once or twice.
+**Public exports are the exception to zero comments.** Everything reachable from
+a package's `src/index.ts` gets a JSDoc, since it ships in the published `.d.ts`
+and is all an editor shows. Say what it does, what it fails, throws or rejects
+with, and what a caller cannot see from the types. Add an `@example` only to
+entry points.
 
 ### Modules
 
@@ -80,8 +68,3 @@ Every exported function that returns an `Effect` gets a plain counterpart: a
 `Sync` variant that throws the typed error when it does no I/O, or a `Promise`
 variant that rejects with it when it does. For example, `Catalog.decodeSync`
 sits next to `Catalog.decode`. Usage examples in READMEs always show both.
-
-### Prose
-
-**Never use semicolons or em dashes to structure sentences.** This applies to
-all prose, whether in documentation, comments or strings.
