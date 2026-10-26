@@ -8825,6 +8825,16 @@
     ],
     "website": "https://www.webmandesign.eu/portfolio/auberge-wordpress-theme/"
   },
+  "audienzz": {
+    "cats": [
+      1
+    ],
+    "icon": "audienzz.png",
+    "js": {
+      "audienzz": ""
+    },
+    "website": "https://audienzz.ch"
+  },
   "AudioEye": {
     "cats": [
       68
@@ -8858,6 +8868,23 @@
     ],
     "icon": "Audiohook.svg",
     "website": "https://www.audiohook.com"
+  },
+  "Audion": {
+    "cats": [
+      36
+    ],
+    "description": "Audion is a digital audio advertising company; its Audion360 podcast player is embedded on publisher pages and loads from 360.audion.fm.",
+    "dom": [
+      "#audion360-podcast-player-init, .audion-reader"
+    ],
+    "icon": "Audion.png",
+    "scriptSrc": [
+      "\\.360\\.audion\\.fm/"
+    ],
+    "website": "https://www.audion.fm",
+    "xhr": [
+      "\\.audion\\.fm"
+    ]
   },
   "Auglio": {
     "cats": [
@@ -9591,6 +9618,19 @@
     ],
     "saas": true,
     "website": "https://www.avanser.com"
+  },
+  "AvantisVideo": {
+    "cats": [
+      36
+    ],
+    "icon": "AvantisVideo.png",
+    "js": {
+      "avantisJS": ""
+    },
+    "scripts": [
+      "//cdn\\.avantisvideo\\.com"
+    ],
+    "website": "https://www.avantisvideo.com"
   },
   "Avasam": {
     "cats": [
