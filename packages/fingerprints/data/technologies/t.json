@@ -1179,6 +1179,16 @@
     ],
     "website": "https://www.taurosmedia.com"
   },
+  "Tave": {
+    "cats": [
+      72
+    ],
+    "dom": [
+      "iframe[src*='tave.com']"
+    ],
+    "icon": "Tave.png",
+    "website": "https://tave.com"
+  },
   "Tawk.to": {
     "cats": [
       52
@@ -1814,6 +1824,11 @@
       1
     ],
     "description": "Terminalfour is a digital engagement and web content management platform for higher education.",
+    "html": [
+      "<[^>]+terminalfour\\.net/",
+      "<[^>]+t4Edit-page",
+      "<[^>]+/terminalfour/page/(?:section|content|directEdit)"
+    ],
     "icon": "Terminalfour.svg",
     "meta": {
       "generator": "TERMINALFOUR"
@@ -5316,6 +5331,16 @@
     "saas": true,
     "website": "https://www.traek.io"
   },
+  "Traffective": {
+    "cats": [
+      36
+    ],
+    "icon": "Traffective.png",
+    "js": {
+      "traffectiveLib": ""
+    },
+    "website": "https://www.traffective.com"
+  },
   "TrafficGuard": {
     "cats": [
       36
@@ -6636,6 +6661,17 @@
     ],
     "saas": true,
     "website": "https://tutorlms.com"
+  },
+  "Tutorbird": {
+    "cats": [
+      72
+    ],
+    "dom": [
+      "iframe[src*='.tutorbird.com']",
+      "a[href*='.tutorbird.com']"
+    ],
+    "icon": "Tutorbird.png",
+    "website": "https://tutorbird.com"
   },
   "TutorCruncher": {
     "cats": [

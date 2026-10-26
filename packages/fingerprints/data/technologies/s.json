@@ -8550,6 +8550,16 @@
     ],
     "website": "https://smarterclick.com"
   },
+  "SmartFrame": {
+    "cats": [
+      95
+    ],
+    "html": [
+      "<link rel=\"dns-prefetch\" href=\"//static\\.smartframe\\.io\""
+    ],
+    "icon": "SmartFrame.png",
+    "website": "https://smartframe.io"
+  },
   "SmartFront": {
     "cats": [
       108,
@@ -9475,6 +9485,21 @@
     ],
     "website": "https://www.soci.ai"
   },
+  "SociableKIT": {
+    "cats": [
+      5
+    ],
+    "description": "Sociable kit",
+    "html": [
+      "<iframe[^>]*src=[^>]*widgets\\.sociablekit\\.com",
+      "<img[^>]*src=[^>]*images\\.sociablekit\\.com"
+    ],
+    "icon": "SociableKIT.png",
+    "scriptSrc": [
+      "widgets\\.sociablekit\\.com"
+    ],
+    "website": "https://www.sociablekit.com/"
+  },
   "Social Pinpoint": {
     "cats": [
       1
@@ -10069,6 +10094,16 @@
     },
     "saas": true,
     "website": "https://sendsonar.com"
+  },
+  "Sonares": {
+    "cats": [
+      5
+    ],
+    "html": [
+      "<iframe [^>]*src=[^>]*content\\.sonares\\.org/[^\"/]+"
+    ],
+    "icon": "Sonares.png",
+    "website": "https://sonares.org/"
   },
   "SonarQube": {
     "cats": [
@@ -11723,6 +11758,16 @@
       "\\.sprocket\\.bz/"
     ],
     "website": "https://www.sprocket.bz"
+  },
+  "SproutStudio": {
+    "cats": [
+      72
+    ],
+    "dom": [
+      "iframe[src*='.sproutstudio.com']"
+    ],
+    "icon": "SproutStudio.png",
+    "website": "https://getsproutstudio.com"
   },
   "Spruce": {
     "cats": [
