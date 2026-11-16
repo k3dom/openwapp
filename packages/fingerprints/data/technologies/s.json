@@ -1517,6 +1517,19 @@
     ],
     "website": "https://www.scheduleanyone.com"
   },
+  "Schedulicity": {
+    "cats": [
+      72
+    ],
+    "dom": [
+      "a[href*='schedulicity.com/scheduling/']"
+    ],
+    "icon": "Schedulicity.png",
+    "scripts": [
+      "api\\.schedulicity\\.com"
+    ],
+    "website": "https://www.schedulicity.com"
+  },
   "Schema App": {
     "cats": [
       54
@@ -3624,6 +3637,20 @@
     ],
     "website": "https://setrow.com"
   },
+  "Setupad": {
+    "cats": [
+      36
+    ],
+    "description": "Setupad is a header-bidding monetization platform; sites load its wrapper from stpd.cloud and bid via prebid.setupad.io.",
+    "icon": "Setupad.png",
+    "scriptSrc": [
+      "stpd\\.cloud/"
+    ],
+    "website": "https://setupad.com",
+    "xhr": [
+      "(?:\\.stpd\\.cloud|\\.setupad\\.(?:io|com|net))"
+    ]
+  },
   "SEUR": {
     "cats": [
       99
@@ -4654,6 +4681,34 @@
     "saas": true,
     "website": "https://www.shopfactory.com"
   },
+  "ShopFast": {
+    "cats": [
+      6
+    ],
+    "description": "ShopFast is a hosted ecommerce platform for selling digital products, with customisable storefronts on shopfa.st subdomains or custom domains.",
+    "dom": [
+      "a.sf-powered[href^='https://shopfa.st/']",
+      "img[src^='https://media.shopfa.st/']",
+      "script#sf-skeletons[type='application/json']"
+    ],
+    "icon": "ShopFast.svg",
+    "meta": {
+      "sf:page-type": ""
+    },
+    "pricing": [
+      "freemium",
+      "low",
+      "recurring"
+    ],
+    "saas": true,
+    "scriptSrc": [
+      "/_sf/runtime\\.[\\da-f]{12}\\.js"
+    ],
+    "url": [
+      "^https?://[^/]+\\.shopfa\\.st/"
+    ],
+    "website": "https://shopfa.st"
+  },
   "Shopflo": {
     "cats": [
       41
@@ -4778,7 +4833,7 @@
   },
   "Shopify Buy Button": {
     "cats": [
-      100
+      6
     ],
     "description": "Shopify Buy Button is an app from Shopify which allows merchant to embed buy functionality for any product or collection into another website or blog.",
     "icon": "Shopify.svg",
@@ -4789,7 +4844,7 @@
       "freemium"
     ],
     "scriptSrc": [
-      "sdk\\. shopifycdn\\.com/buy-button/latest/"
+      "sdks\\.shopifycdn\\.com/buy-button/"
     ],
     "website": "https://apps.shopify.com/buy-button"
   },
@@ -8286,6 +8341,9 @@
       }
     },
     "icon": "Slim-SEO.svg",
+    "requires": [
+      "WordPress"
+    ],
     "website": "https://wpslimseo.com"
   },
   "Slimbox": {
@@ -8549,6 +8607,16 @@
       "\\.?smct\\.(?:io|co)/"
     ],
     "website": "https://smarterclick.com"
+  },
+  "SmartFrame": {
+    "cats": [
+      95
+    ],
+    "html": [
+      "<link rel=\"dns-prefetch\" href=\"//static\\.smartframe\\.io\""
+    ],
+    "icon": "SmartFrame.png",
+    "website": "https://smartframe.io"
   },
   "SmartFront": {
     "cats": [
@@ -9475,6 +9543,21 @@
     ],
     "website": "https://www.soci.ai"
   },
+  "SociableKIT": {
+    "cats": [
+      5
+    ],
+    "description": "Sociable kit",
+    "html": [
+      "<iframe[^>]*src=[^>]*widgets\\.sociablekit\\.com",
+      "<img[^>]*src=[^>]*images\\.sociablekit\\.com"
+    ],
+    "icon": "SociableKIT.png",
+    "scriptSrc": [
+      "widgets\\.sociablekit\\.com"
+    ],
+    "website": "https://www.sociablekit.com/"
+  },
   "Social Pinpoint": {
     "cats": [
       1
@@ -10069,6 +10152,16 @@
     },
     "saas": true,
     "website": "https://sendsonar.com"
+  },
+  "Sonares": {
+    "cats": [
+      5
+    ],
+    "html": [
+      "<iframe [^>]*src=[^>]*content\\.sonares\\.org/[^\"/]+"
+    ],
+    "icon": "Sonares.png",
+    "website": "https://sonares.org/"
   },
   "SonarQube": {
     "cats": [
@@ -10702,6 +10795,9 @@
     "meta": {
       "generator": "^speculation-rules ([\\d.]+)?\\;version:\\1"
     },
+    "requires": [
+      "WordPress"
+    ],
     "website": "https://wordpress.org/plugins/speculation-rules/"
   },
   "Speed Kit": {
@@ -11723,6 +11819,16 @@
       "\\.sprocket\\.bz/"
     ],
     "website": "https://www.sprocket.bz"
+  },
+  "SproutStudio": {
+    "cats": [
+      72
+    ],
+    "dom": [
+      "iframe[src*='.sproutstudio.com']"
+    ],
+    "icon": "SproutStudio.png",
+    "website": "https://getsproutstudio.com"
   },
   "Spruce": {
     "cats": [
@@ -12873,6 +12979,49 @@
     },
     "oss": true,
     "website": "https://stenciljs.com"
+  },
+  "Stencil (hellostencil.com)": {
+    "cats": [
+      51
+    ],
+    "description": "Stencil is an AI app builder that creates, hosts and publishes web apps from a plain-language description.",
+    "icon": "hellostencil.png",
+    "meta": {
+      "generator": "^Stencil \\(hellostencil\\.com\\)$"
+    },
+    "pricing": [
+      "low",
+      "freemium",
+      "recurring"
+    ],
+    "saas": true,
+    "website": "https://hellostencil.com"
+  },
+  "SterkCommerce": {
+    "cats": [
+      6,
+      1
+    ],
+    "cookies": {
+      "sterk_search_bucket": ""
+    },
+    "description": "SterkCommerce is a headless e-commerce platform and CMS (Next.js storefront with Magento or custom backends) by Sterk Commerce.",
+    "headers": {
+      "X-Powered-By": "^SterkCommerce$"
+    },
+    "icon": "SterkCommerce.png",
+    "implies": [
+      "Next.js",
+      "React"
+    ],
+    "js": {
+      "SterkCommerce.name": "^SterkCommerce$",
+      "SterkCommerce.version": "^(.+)$\\;version:\\1"
+    },
+    "meta": {
+      "generator": "^SterkCommerce(?: Cloud)?(?: ([\\d.]+))?$\\;version:\\1"
+    },
+    "website": "https://sterkcommerce.com"
   },
   "Stetic Analytics": {
     "cats": [
@@ -14974,6 +15123,9 @@
     ],
     "description": "Upsell is a tool that boosts Shopify store profits by automating product upsells.",
     "icon": "SweetUpsell.svg",
+    "implies": [
+      "Shopify"
+    ],
     "pricing": [
       "freemium",
       "low",

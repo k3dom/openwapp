@@ -442,6 +442,17 @@
     ],
     "website": "https://odoo.com"
   },
+  "Offerista": {
+    "cats": [
+      36
+    ],
+    "description": "Offerista is a retail-marketing network; publisher pages embed its brochure widgets served from marktjagd.com and offerista.com.",
+    "icon": "Offerista.png",
+    "website": "https://www.offerista.com",
+    "xhr": [
+      "(?:offerista\\.com|marktjagd\\.(?:com|de))"
+    ]
+  },
   "Offline.js": {
     "cats": [
       59
@@ -2274,6 +2285,9 @@
     "meta": {
       "generator": "^optimization-detective ([\\d.]+)?\\;version:\\1"
     },
+    "requires": [
+      "WordPress"
+    ],
     "website": "https://wordpress.org/plugins/optimization-detective/"
   },
   "Optimizely": {
@@ -3262,6 +3276,9 @@
       "<div[^>]+class=[\"']wp-block-themeisle-blocks-*"
     ],
     "icon": "otter-blocks.png",
+    "requires": [
+      "WordPress"
+    ],
     "website": "https://wordpress.org/plugins/otter-blocks/"
   },
   "OtterText": {
